@@ -42,7 +42,6 @@ function MediaRow({ title, items, onSelect }) {
 }
 
 function Home() {
-  const [activeNav, setActiveNav] = useState('home')
   const [heroIndex, setHeroIndex] = useState(0)
   const navigate = useNavigate()
 
@@ -58,7 +57,7 @@ function Home() {
 
   return (
     <div className="home-page">
-      <Navbar activeNav={activeNav} onNavChange={setActiveNav} />
+      <Navbar activeNav="home" />
 
       <main>
         <section className="hero">

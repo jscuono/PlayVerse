@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home as HomeIcon, Film, Tv, Music2, Gamepad2, Search,
   ChevronDown, User, ListPlus, LogOut,
@@ -8,16 +8,19 @@ import Logo from './Logo.jsx'
 import './Navbar.css'
 
 export const navItems = [
-  { key: 'home', label: 'Home', icon: HomeIcon },
-  { key: 'movies', label: 'Movies', icon: Film },
-  { key: 'shows', label: 'TV Series', icon: Tv },
-  { key: 'music', label: 'Music', icon: Music2 },
-  { key: 'games', label: 'Games', icon: Gamepad2 },
+  { key: 'home', label: 'Home', icon: HomeIcon, path: '/home' },
+  { key: 'movies', label: 'Movies', icon: Film, path: '/movies' },
+  { key: 'shows', label: 'TV Series', icon: Tv, path: '/shows' },
+  { key: 'music', label: 'Music', icon: Music2, path: '/music' },
+  { key: 'games', label: 'Games', icon: Gamepad2, path: '/games' },
 ]
 
-function Navbar({ activeNav = 'home', onNavChange }) {
+function Navbar({ activeNav }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const resolvedActive = activeNav ?? (location.pathname.replace('/', '') || 'home')
 
   return (
     <nav className="navbar">
@@ -27,12 +30,12 @@ function Navbar({ activeNav = 'home', onNavChange }) {
       </div>
 
       <ul className="nav-links">
-        {navItems.map(({ key, label, icon: Icon }) => (
+        {navItems.map(({ key, label, icon: Icon, path }) => (
           <li key={key}>
             <button
               type="button"
-              className={activeNav === key ? 'nav-link active' : 'nav-link'}
-              onClick={() => (onNavChange ? onNavChange(key) : navigate('/home'))}
+              className={resolvedActive === key ? 'nav-link active' : 'nav-link'}
+              onClick={() => navigate(path)}
             >
               <Icon size={16} />
               {label}
@@ -40,14 +43,14 @@ function Navbar({ activeNav = 'home', onNavChange }) {
           </li>
         ))}
         <li>
-            <button
+          <button
             type="button"
-            className={activeNav === 'search' ? 'nav-link active' : 'nav-link'}
+            className={resolvedActive === 'search' ? 'nav-link active' : 'nav-link'}
             onClick={() => navigate('/search')}
-            >
-                <Search size={16} />
-                Search
-            </button>
+          >
+            <Search size={16} />
+            Search
+          </button>
         </li>
       </ul>
 
@@ -59,10 +62,10 @@ function Navbar({ activeNav = 'home', onNavChange }) {
         {menuOpen && (
           <div className="user-dropdown">
             <button type="button" onClick={() => navigate('/account')}>
-                <User size={16} /> Account
+              <User size={16} /> Account
             </button>
             <button type="button" onClick={() => navigate('/playlists')}>
-                 <ListPlus size={16} /> Playlists
+              <ListPlus size={16} /> Playlists
             </button>
             <button type="button" onClick={() => navigate('/')}>
               <LogOut size={16} /> Sign Out

@@ -54,7 +54,7 @@ function Search() {
       <main className="search-main">
         <div className="search-head">
           <div>
-            <h1>Search / {category.label}</h1>
+            <h1>Search</h1>
             <p>Discover what to watch, what to hear, and what to play next.</p>
 
             <div className="search-input">

@@ -21,11 +21,28 @@ const providerCatalog = {
   steam: { label: 'Steam', bg: '#1b2838', fg: '#fff' },
 }
 
-const genresByType = {
-  movie: ['Action • Sci-Fi', 'Drama • Thriller', 'Comedy • Romance', 'Horror • Mystery'],
-  show: ['Drama • Mystery', 'Action • Thriller', 'Comedy', 'Sci-Fi • Drama'],
-  music: ['Indie Pop', 'Synthwave', 'Alt Rock', 'Lo-fi'],
-  game: ['Action • RPG', 'Open World', 'Strategy', 'Adventure'],
+// Full genre lists per category — shown as filter pills on each category page.
+export const genresByCategory = {
+  movies: ['Action', 'Sci-Fi', 'Drama', 'Thriller', 'Comedy', 'Romance', 'Horror', 'Mystery'],
+  shows: ['Drama', 'Mystery', 'Action', 'Thriller', 'Comedy', 'Sci-Fi', 'Crime', 'Fantasy'],
+  music: ['Indie Pop', 'Synthwave', 'Alt Rock', 'Lo-fi', 'Hip-Hop', 'R&B', 'Folk', 'Electronic'],
+  games: ['Action', 'RPG', 'Open World', 'Strategy', 'Adventure', 'Simulation', 'Puzzle', 'Horror'],
+}
+
+// Two-genre combos assigned round-robin to items within each category.
+const genrePairsByCategory = {
+  movies: [
+    ['Action', 'Sci-Fi'], ['Drama', 'Thriller'], ['Comedy', 'Romance'], ['Horror', 'Mystery'],
+  ],
+  shows: [
+    ['Drama', 'Mystery'], ['Action', 'Thriller'], ['Comedy', 'Crime'], ['Sci-Fi', 'Fantasy'],
+  ],
+  music: [
+    ['Indie Pop'], ['Synthwave', 'Electronic'], ['Alt Rock'], ['Lo-fi'], ['Hip-Hop'], ['R&B'], ['Folk'],
+  ],
+  games: [
+    ['Action', 'RPG'], ['Open World', 'Adventure'], ['Strategy'], ['Simulation'], ['Puzzle'], ['Action', 'Horror'],
+  ],
 }
 
 const providersByType = {
@@ -38,30 +55,38 @@ const providersByType = {
 const durationLabelByType = { movie: 'Runtime', show: 'Runtime', music: 'Duration', game: 'Playtime' }
 const tagByType = { movie: 'Movie', show: 'Series', music: 'Song', game: 'Game' }
 const sourceByType = { movie: 'TMDB', show: 'TMDB', music: 'Spotify', game: 'IGDB' }
+const categoryByType = { movie: 'movies', show: 'shows', music: 'music', game: 'games' }
 
 function build(type, names) {
-  return names.map((title, i) => ({
-    id: `${title}-${i}`,
-    type,
-    tag: tagByType[type],
-    title,
-    gradient: gradients[i % gradients.length],
-    genre: genresByType[type][i % genresByType[type].length],
-    date: `0${(i % 9) + 1}/12/2026`,
-    duration:
-      type === 'music'
-        ? `${2 + (i % 3)}:${String((15 + i * 7) % 60).padStart(2, '0')}`
-        : `${1 + (i % 2)}h ${20 + i * 3}m`,
-    durationLabel: durationLabelByType[type],
-    language: 'English',
-    source: sourceByType[type],
-    description:
-      'A short synopsis will go here once real catalog data is connected. For now this is placeholder copy so the layout can be reviewed end to end.',
-    providers: providersByType[type][i % providersByType[type].length].map((key) => ({
-      key,
-      ...providerCatalog[key],
-    })),
-  }))
+  const category = categoryByType[type]
+  const pairs = genrePairsByCategory[category]
+
+  return names.map((title, i) => {
+    const genres = pairs[i % pairs.length]
+    return {
+      id: `${title}-${i}`,
+      type,
+      tag: tagByType[type],
+      title,
+      gradient: gradients[i % gradients.length],
+      genres,
+      genre: genres.join(' • '),
+      date: `0${(i % 9) + 1}/12/2026`,
+      duration:
+        type === 'music'
+          ? `${2 + (i % 3)}:${String((15 + i * 7) % 60).padStart(2, '0')}`
+          : `${1 + (i % 2)}h ${20 + i * 3}m`,
+      durationLabel: durationLabelByType[type],
+      language: 'English',
+      source: sourceByType[type],
+      description:
+        'A short synopsis will go here once real catalog data is connected. For now this is placeholder copy so the layout can be reviewed end to end.',
+      providers: providersByType[type][i % providersByType[type].length].map((key) => ({
+        key,
+        ...providerCatalog[key],
+      })),
+    }
+  })
 }
 
 export const movies = build('movie', [
