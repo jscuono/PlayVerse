@@ -54,7 +54,9 @@ function Navbar({ activeNav = 'home', onNavChange }) {
         </button>
         {menuOpen && (
           <div className="user-dropdown">
-            <button type="button"><User size={16} /> Account</button>
+            <button type="button" onClick={() => navigate('/account')}>
+                <User size={16} /> Account
+            </button>
             <button type="button"><ListPlus size={16} /> Playlists</button>
             <button type="button" onClick={() => navigate('/')}>
               <LogOut size={16} /> Sign Out

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import Home from './pages/Home.jsx'
 import MediaDetail from './pages/MediaDetail.jsx'
+import Account from './pages/Account.jsx'
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <Route path="/" element={<Login />} />
       <Route path="/home" element={<Home />} />
       <Route path="/media/:id" element={<MediaDetail />} />
+      <Route path="/account" element={<Account />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
