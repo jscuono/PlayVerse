@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Logo from "../components/Logo.jsx";
 import "./Login.css";
+import { Link } from "react-router-dom";
 
 const panels = [
   {
@@ -54,64 +55,64 @@ function Login() {
   const API_URL = "http://localhost:5000";
 
   //  This is the handleSubmit function while testing the frontend without the backend.
-  async function handleSubmit(e) {
-    e.preventDefault();
-    navigate("/home");
-  }
+  // async function handleSubmit(e) {
+  //   e.preventDefault();
+  //   navigate("/home");
+  // }
 
   //  This is the working handleSubmit function that handles both login and registration form submissions using the backend, following the email verification process.
   // I temporarily commented it out to avoid errors while testing the frontend without the backend.
-  // async function handleSubmit(e) {
-  //   e.preventDefault();
+  async function handleSubmit(e) {
+    e.preventDefault();
 
-  //   if (password !== confirmPassword && mode === "register") {
-  //     alert("Passwords do not match.");
-  //     return;
-  //   }
+    if (password !== confirmPassword && mode === "register") {
+      alert("Passwords do not match.");
+      return;
+    }
 
-  //   const isRegistering = mode === "register";
+    const isRegistering = mode === "register";
 
-  //   const endpoint = isRegistering ? "/api/auth/register" : "/api/auth/login";
+    const endpoint = isRegistering ? "/api/auth/register" : "/api/auth/login";
 
-  //   const body = isRegistering
-  //     ? {
-  //         firstName: name,
-  //         lastName: lastname,
-  //         email,
-  //         password,
-  //       }
-  //     : {
-  //         email,
-  //         password,
-  //       };
+    const body = isRegistering
+      ? {
+          firstName: name,
+          lastName: lastname,
+          email,
+          password,
+        }
+      : {
+          email,
+          password,
+        };
 
-  //   try {
-  //     const response = await fetch(`${API_URL}${endpoint}`, {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       credentials: "include",
-  //       body: JSON.stringify(body),
-  //     });
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
 
-  //     const data = await response.json();
+      const data = await response.json();
 
-  //     if (!response.ok) {
-  //       throw new Error(data.message || "Authentication failed.");
-  //     }
+      if (!response.ok) {
+        throw new Error(data.message || "Authentication failed.");
+      }
 
-  //     if (isRegistering) {
-  //       alert(data.message);
-  //       navigate("/login");
-  //       return;
-  //     }
+      if (isRegistering) {
+        alert(data.message);
+        navigate("/login");
+        return;
+      }
 
-  //     navigate("/home");
-  //   } catch (error) {
-  //     alert(error.message);
-  //   }
-  // }
+      navigate("/home");
+    } catch (error) {
+      alert(error.message);
+    }
+  }
 
   return (
     <div className="login-page">
@@ -198,6 +199,11 @@ function Login() {
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
+                </div>
+                <div className="forgot-password-row">
+                  <Link to="/forgot-password" className="forgot-password-link">
+                    Forgot password?
+                  </Link>
                 </div>
 
                 <button type="submit" className="submit-btn">

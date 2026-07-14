@@ -43,6 +43,56 @@ async function sendVerificationEmail(email, token) {
   });
 }
 
+async function sendPasswordResetEmail(email, token) {
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+
+  await sgMail.send({
+    to: email,
+
+    from: {
+      email: process.env.SENDGRID_FROM_EMAIL,
+      name: "PlayVerse",
+    },
+
+    subject: "Reset your PlayVerse password",
+
+    text: `Reset your PlayVerse password using this link: ${resetUrl}`,
+
+    html: `
+      <div style="font-family: Arial, sans-serif;">
+        <h2>Reset your PlayVerse password</h2>
+
+        <p>
+          We received a request to reset your password.
+        </p>
+
+        <p>
+          This link expires in one hour.
+        </p>
+
+        <a
+          href="${resetUrl}"
+          style="
+            display: inline-block;
+            padding: 12px 18px;
+            background: #6c5ce7;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+          "
+        >
+          Reset password
+        </a>
+
+        <p>
+          If you did not request this, you can ignore this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 module.exports = {
   sendVerificationEmail,
+  sendPasswordResetEmail,
 };
