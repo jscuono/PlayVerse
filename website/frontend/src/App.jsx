@@ -8,6 +8,8 @@ import Playlists from "./pages/Playlists.jsx";
 import CategoryPage from "./pages/CategoryPage.jsx";
 import { movies, shows, music, games } from "./data/mockData.js";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 
 function App() {
   return (
@@ -38,6 +40,9 @@ function App() {
       />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+
+      <Route path="/reset-password" element={<ResetPassword />} />
     </Routes>
   );
 }

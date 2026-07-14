@@ -1,48 +1,64 @@
-import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState("Verifying your email...");
-  const [verified, setVerified] = useState(false);
+
+  const [status, setStatus] = useState("verifying");
+  const [message, setMessage] = useState(
+    "Verifying your email..."
+  );
+
+  const verificationStarted = useRef(false);
 
   useEffect(() => {
+    // Prevent React development mode from sending the request twice.
+    if (verificationStarted.current) {
+      return;
+    }
+
+    verificationStarted.current = true;
+
     const token = searchParams.get("token");
 
-    console.log("Token from URL:", token);
-
     if (!token) {
-      setStatus("The verification token is missing.");
+      setStatus("error");
+      setMessage("This verification link is invalid.");
       return;
     }
 
     async function verifyEmail() {
       try {
-        const response = await fetch(`${API_URL}/api/auth/verify-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token,
-          }),
-        });
+        const response = await fetch(
+          "http://localhost:5000/api/auth/verify-email",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token,
+            }),
+          }
+        );
 
         const data = await response.json();
 
-        console.log("Verification response:", data);
-
         if (!response.ok) {
-          throw new Error(data.message || "Email verification failed.");
+          throw new Error(
+            data.message ||
+              "This verification link is invalid."
+          );
         }
 
-        setVerified(true);
-        setStatus(data.message);
+        setStatus("success");
+        setMessage(
+          data.message ||
+            "Your email has been verified successfully."
+        );
       } catch (error) {
-        console.error(error);
-        setStatus(error.message);
+        setStatus("error");
+        setMessage(error.message);
       }
     }
 
@@ -50,12 +66,12 @@ function VerifyEmail() {
   }, [searchParams]);
 
   return (
-    <main>
+    <main className="verify-email-page">
       <h1>Email verification</h1>
 
-      <p>{status}</p>
-
-      {verified && <Link to="/">Return to login</Link>}
+      <p className={`verification-message ${status}`}>
+        {message}
+      </p>
     </main>
   );
 }
