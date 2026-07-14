@@ -1,9 +1,17 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Clock, Plus, ChevronRight, ChevronLeft } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  Plus,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { movies, shows, music, games, heroSlides } from "../data/mockData.js";
 import "./Home.css";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 function MediaRow({ title, items, onSelect }) {
   const scrollerRef = useRef(null);
@@ -56,9 +64,59 @@ function MediaRow({ title, items, onSelect }) {
 
 function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
+  const [addingMediaId, setAddingMediaId] = useState(null);
+  const [addedMediaIds, setAddedMediaIds] = useState(() => new Set());
+  const [playlistMessage, setPlaylistMessage] = useState("");
+  const [playlistError, setPlaylistError] = useState("");
+  const [playlistsLoading, setPlaylistsLoading] = useState(true);
+
   const navigate = useNavigate();
 
   const hero = heroSlides[heroIndex];
+  const heroIsInPlaylist = addedMediaIds.has(String(hero.id));
+
+  useEffect(() => {
+    async function loadPlaylists() {
+      try {
+        setPlaylistsLoading(true);
+        setPlaylistError("");
+
+        const response = await fetch(`${API_URL}/api/auth/playlists`, {
+          method: "GET",
+          credentials: "include",
+        });
+
+        const data = await response.json();
+
+        if (response.status === 401) {
+          navigate("/login", {
+            replace: true,
+          });
+
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(data.message || "Unable to load your playlists.");
+        }
+
+        const playlistIds = [
+          ...(data.playlists?.movies || []),
+          ...(data.playlists?.tvSeries || []),
+          ...(data.playlists?.music || []),
+          ...(data.playlists?.games || []),
+        ].map(String);
+
+        setAddedMediaIds(new Set(playlistIds));
+      } catch (error) {
+        setPlaylistError(error.message);
+      } finally {
+        setPlaylistsLoading(false);
+      }
+    }
+
+    loadPlaylists();
+  }, [navigate]);
 
   function changeHero(dir) {
     setHeroIndex((i) => (i + dir + heroSlides.length) % heroSlides.length);
@@ -66,6 +124,110 @@ function Home() {
 
   function openMedia(item) {
     navigate(`/media/${encodeURIComponent(item.id)}`);
+  }
+
+  function handlePlaylistClick(item) {
+    if (addedMediaIds.has(String(item.id))) {
+      removeFromPlaylist(item);
+    } else {
+      addToPlaylist(item);
+    }
+  }
+
+  async function removeFromPlaylist(item) {
+    try {
+      setAddingMediaId(item.id);
+      setPlaylistMessage("");
+      setPlaylistError("");
+
+      const response = await fetch(`${API_URL}/api/auth/playlists/items`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          mediaId: item.id,
+          mediaType: item.type,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        navigate("/login", {
+          replace: true,
+        });
+
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to remove this item from your playlist.",
+        );
+      }
+
+      setAddedMediaIds((previousIds) => {
+        const nextIds = new Set(previousIds);
+        nextIds.delete(String(item.id));
+        return nextIds;
+      });
+
+      setPlaylistMessage(data.message);
+    } catch (error) {
+      setPlaylistError(error.message);
+    } finally {
+      setAddingMediaId(null);
+    }
+  }
+
+  async function addToPlaylist(item) {
+    try {
+      setAddingMediaId(item.id);
+      setPlaylistMessage("");
+      setPlaylistError("");
+
+      const response = await fetch(`${API_URL}/api/auth/playlists/items`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          mediaId: item.id,
+          mediaType: item.type,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        navigate("/login", {
+          replace: true,
+        });
+
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to add this item to your playlist.",
+        );
+      }
+
+      setAddedMediaIds((previousIds) => {
+        const nextIds = new Set(previousIds);
+        nextIds.add(String(item.id));
+        return nextIds;
+      });
+
+      setPlaylistMessage(data.message);
+    } catch (error) {
+      setPlaylistError(error.message);
+    } finally {
+      setAddingMediaId(null);
+    }
   }
 
   return (
@@ -95,8 +257,31 @@ function Home() {
               >
                 View <ChevronRight size={16} />
               </button>
-              <button type="button" className="hero-playlist">
-                <Plus size={16} /> Playlist
+              <button
+                type="button"
+                className="hero-playlist"
+                onClick={() => handlePlaylistClick(hero)}
+                disabled={playlistsLoading || addingMediaId === hero.id}
+              >
+                {playlistsLoading ? (
+                  "Loading..."
+                ) : addingMediaId === hero.id ? (
+                  heroIsInPlaylist ? (
+                    "Removing..."
+                  ) : (
+                    "Adding..."
+                  )
+                ) : heroIsInPlaylist ? (
+                  <>
+                    <Check size={16} />
+                    Remove
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Playlist
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -146,5 +331,7 @@ function Home() {
     </div>
   );
 }
+
+
 
 export default Home;

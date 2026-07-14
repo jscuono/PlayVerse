@@ -284,6 +284,27 @@
   object-fit: cover;
 }
 
+.forgot-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.forgot-password-link {
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.form-success {
+  margin-top: 12px;
+  color: #16794b;
+}
+
+.form-error {
+  margin-top: 12px;
+  color: #b42318;
+}
+
 @media (max-width: 900px) {
   .login-top {
     flex-direction: column;

@@ -11,13 +11,15 @@ import {
   Tag,
   Globe,
   Database,
+  Calendar,
   CalendarDays,
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import RatingModal from "../components/RatingModal.jsx";
 import { getMediaById } from "../data/mockData.js";
-import { isInPlaylist, togglePlaylist } from "../utils/playlist.js";
 import "./MediaDetail.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const navKeyByType = {
   movie: "movies",
@@ -57,13 +59,65 @@ function MediaDetail() {
   const [rating, setRating] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [inPlaylist, setInPlaylist] = useState(false);
+  const [playlistLoading, setPlaylistLoading] = useState(true);
+  const [playlistUpdating, setPlaylistUpdating] = useState(false);
+  const [playlistMessage, setPlaylistMessage] = useState("");
+  const [playlistError, setPlaylistError] = useState("");
 
   useEffect(() => {
-    if (!item) return;
-    const stored = window.localStorage.getItem(ratingKey(item.id));
-    setRating(stored ? Number(stored) : 0);
-    setInPlaylist(isInPlaylist(item.id));
-  }, [item]);
+    if (!item) {
+      return;
+    }
+
+    const storedRating = window.localStorage.getItem(ratingKey(item.id));
+
+    setRating(storedRating ? Number(storedRating) : 0);
+
+    async function loadPlaylistStatus() {
+      try {
+        setPlaylistLoading(true);
+        setPlaylistError("");
+
+        const response = await fetch(`${API_URL}/api/auth/playlists`, {
+          method: "GET",
+          credentials: "include",
+        });
+
+        const data = await response.json();
+
+        if (response.status === 401) {
+          navigate("/login", {
+            replace: true,
+          });
+
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(data.message || "Unable to load your playlist.");
+        }
+
+        const playlistKeyByType = {
+          movie: "movies",
+          show: "tvSeries",
+          music: "music",
+          game: "games",
+        };
+
+        const playlistKey = playlistKeyByType[item.type];
+
+        const savedIds = (data.playlists?.[playlistKey] || []).map(String);
+
+        setInPlaylist(savedIds.includes(String(item.id)));
+      } catch (error) {
+        setPlaylistError(error.message);
+      } finally {
+        setPlaylistLoading(false);
+      }
+    }
+
+    loadPlaylistStatus();
+  }, [item, navigate]);
 
   if (!item) {
     return (
@@ -91,8 +145,98 @@ function MediaDetail() {
     setModalOpen(false);
   }
 
-  function handleTogglePlaylist() {
-    setInPlaylist(togglePlaylist(item.id));
+  async function addToPlaylist() {
+    try {
+      setPlaylistUpdating(true);
+      setPlaylistMessage("");
+      setPlaylistError("");
+
+      const response = await fetch(`${API_URL}/api/auth/playlists/items`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          mediaId: String(item.id),
+          mediaType: item.type,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        navigate("/login", {
+          replace: true,
+        });
+
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to add this item to your playlist.",
+        );
+      }
+
+      setInPlaylist(true);
+      setPlaylistMessage(data.message);
+    } catch (error) {
+      setPlaylistError(error.message);
+    } finally {
+      setPlaylistUpdating(false);
+    }
+  }
+
+  async function removeFromPlaylist() {
+    try {
+      setPlaylistUpdating(true);
+      setPlaylistMessage("");
+      setPlaylistError("");
+
+      const response = await fetch(`${API_URL}/api/auth/playlists/items`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          mediaId: String(item.id),
+          mediaType: item.type,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.status === 401) {
+        navigate("/login", {
+          replace: true,
+        });
+
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to remove this item from your playlist.",
+        );
+      }
+
+      setInPlaylist(false);
+      setPlaylistMessage(data.message);
+    } catch (error) {
+      setPlaylistError(error.message);
+    } finally {
+      setPlaylistUpdating(false);
+    }
+  }
+
+  function handlePlaylistClick() {
+    if (inPlaylist) {
+      removeFromPlaylist();
+    } else {
+      addToPlaylist();
+    }
   }
 
   return (
@@ -130,10 +274,28 @@ function MediaDetail() {
               <button
                 type="button"
                 className="hero-playlist"
-                onClick={handleTogglePlaylist}
+                onClick={handlePlaylistClick}
+                disabled={playlistLoading || playlistUpdating}
               >
-                {inPlaylist ? <Check size={16} /> : <Plus size={16} />}
-                {inPlaylist ? "In Playlist" : "Playlist"}
+                {playlistLoading ? (
+                  "Loading..."
+                ) : playlistUpdating ? (
+                  inPlaylist ? (
+                    "Removing..."
+                  ) : (
+                    "Adding..."
+                  )
+                ) : inPlaylist ? (
+                  <>
+                    <Check size={16} />
+                    Remove
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Playlist
+                  </>
+                )}
               </button>
               <button type="button" className="hero-view">
                 <Play size={16} /> Trailer

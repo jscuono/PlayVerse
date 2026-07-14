@@ -6,7 +6,7 @@ const { ObjectId } = require("mongodb");
 const { OAuth2Client } = require("google-auth-library");
 
 const { getDB } = require("./db");
-const { sendVerificationEmail } = require("./email");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("./email");
 
 const router = express.Router();
 
@@ -124,7 +124,7 @@ router.post("/register", async (req, res, next) => {
       email,
       passwordHash,
 
-      isEmailVerified: true, // Set to true for development purposes. Change to false to follow the email verification process..
+      isEmailVerified: false, // Set to true for development purposes. Change to false to follow the email verification process..
       verificationTokenHash,
       verificationTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
 
@@ -393,7 +393,6 @@ router.post("/google", async (req, res, next) => {
 });
 
 //Return the currently logged-in user
-
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
     if (!ObjectId.isValid(req.userId)) {
@@ -421,7 +420,6 @@ router.get("/me", requireAuth, async (req, res, next) => {
 });
 
 //Logout
-
 router.post("/logout", (req, res) => {
   res.clearCookie("pv_auth", {
     httpOnly: true,
@@ -432,6 +430,497 @@ router.post("/logout", (req, res) => {
   return res.json({
     message: "Logged out.",
   });
+});
+
+router.delete("/account", requireAuth, async (req, res, next) => {
+  try {
+    if (!ObjectId.isValid(req.userId)) {
+      return res.status(401).json({
+        message: "Invalid login session.",
+      });
+    }
+
+    const users = getDB().collection("users");
+
+    const result = await users.deleteOne({
+      _id: new ObjectId(req.userId),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        message: "Account not found.",
+      });
+    }
+
+    res.clearCookie("pv_auth", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
+    return res.json({
+      message: "Account deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/account", requireAuth, async (req, res, next) => {
+  try {
+    if (!ObjectId.isValid(req.userId)) {
+      return res.status(401).json({
+        message: "Invalid login session.",
+      });
+    }
+
+    const firstName = String(req.body.firstName || "").trim();
+    const lastName = String(req.body.lastName || "").trim();
+    const email = normalizeEmail(req.body.email);
+    const password = String(req.body.password || "");
+
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({
+        message: "First name, last name, and email are required.",
+      });
+    }
+
+    if (password && password.length < 8) {
+      return res.status(400).json({
+        message: "The new password must contain at least 8 characters.",
+      });
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(email)) {
+      return res.status(400).json({
+        message: "Enter a valid email address.",
+      });
+    }
+
+    const users = getDB().collection("users");
+    const userId = new ObjectId(req.userId);
+
+    const currentUser = await users.findOne({
+      _id: userId,
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({
+        message: "Account not found.",
+      });
+    }
+
+    const emailChanged = email !== currentUser.email;
+
+    if (emailChanged) {
+      const emailAlreadyUsed = await users.findOne({
+        email,
+        _id: {
+          $ne: userId,
+        },
+      });
+
+      if (emailAlreadyUsed) {
+        return res.status(409).json({
+          message: "Another account already uses this email.",
+        });
+      }
+    }
+
+    const updates = {
+      firstName,
+      lastName,
+      email,
+      updatedAt: new Date(),
+    };
+
+    if (password) {
+      updates.passwordHash = await bcrypt.hash(password, 12);
+    }
+
+    let verificationToken;
+
+    if (emailChanged) {
+      verificationToken = crypto.randomBytes(32).toString("hex");
+
+      const verificationTokenHash = crypto
+        .createHash("sha256")
+        .update(verificationToken)
+        .digest("hex");
+
+      updates.isEmailVerified = false;
+      updates.verificationTokenHash = verificationTokenHash;
+      updates.verificationTokenExpiresAt = new Date(
+        Date.now() + 60 * 60 * 1000,
+      );
+    }
+
+    await users.updateOne(
+      {
+        _id: userId,
+      },
+      {
+        $set: updates,
+        ...(emailChanged
+          ? {
+              $unset: {
+                verifiedAt: "",
+              },
+            }
+          : {}),
+      },
+    );
+
+    if (emailChanged) {
+      await sendVerificationEmail(email, verificationToken);
+    }
+
+    const updatedUser = await users.findOne({
+      _id: userId,
+    });
+
+    if (emailChanged) {
+      res.clearCookie("pv_auth", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+    }
+
+    return res.json({
+      message: emailChanged
+        ? "Account updated. Verify your new email address before logging in again."
+        : "Account updated successfully.",
+
+      requiresEmailVerification: emailChanged,
+
+      user: getPublicUser(updatedUser),
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Another account already uses this email.",
+      });
+    }
+
+    next(error);
+  }
+});
+
+router.post("/forgot-password", async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+
+    if (!email) {
+      return res.status(400).json({
+        message: "Enter your email address.",
+      });
+    }
+
+    const users = getDB().collection("users");
+
+    const user = await users.findOne({
+      email,
+    });
+
+    /*
+     * Always return the same response.
+     * This prevents people from checking whether an email
+     * has a PlayVerse account.
+     */
+    const genericResponse = {
+      message:
+        "If an account exists for this email, a password-reset link has been sent.",
+    };
+
+    /*
+     * Do not create a reset token for an unknown account
+     * or an account that only uses Google OAuth.
+     */
+    if (!user || !user.passwordHash) {
+      return res.json(genericResponse);
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    await users.updateOne(
+      {
+        _id: user._id,
+      },
+      {
+        $set: {
+          passwordResetTokenHash: resetTokenHash,
+
+          passwordResetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      },
+    );
+
+    await sendPasswordResetEmail(user.email, resetToken);
+
+    return res.json(genericResponse);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/reset-password", async (req, res, next) => {
+  try {
+    const token = String(req.body.token || "");
+    const password = String(req.body.password || "");
+
+    if (!token) {
+      return res.status(400).json({
+        message: "This password-reset link is invalid.",
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "The new password must contain at least 8 characters.",
+      });
+    }
+
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const users = getDB().collection("users");
+
+    const user = await users.findOne({
+      passwordResetTokenHash: resetTokenHash,
+
+      passwordResetTokenExpiresAt: {
+        $gt: new Date(),
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "This password-reset link is invalid or has expired.",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await users.updateOne(
+      {
+        _id: user._id,
+      },
+      {
+        $set: {
+          passwordHash,
+          passwordUpdatedAt: new Date(),
+          updatedAt: new Date(),
+        },
+
+        $unset: {
+          passwordResetTokenHash: "",
+          passwordResetTokenExpiresAt: "",
+        },
+      },
+    );
+
+    /*
+     * Log out the current browser session after changing
+     * the password.
+     */
+    res.clearCookie("pv_auth", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
+    return res.json({
+      message: "Your password has been reset successfully. You can now log in.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const playlistKeyByType = {
+  movie: "movies",
+  movies: "movies",
+
+  show: "tvSeries",
+  shows: "tvSeries",
+  tv: "tvSeries",
+  tvSeries: "tvSeries",
+
+  music: "music",
+
+  game: "games",
+  games: "games",
+};
+
+router.post("/playlists/items", requireAuth, async (req, res, next) => {
+  try {
+    if (!ObjectId.isValid(req.userId)) {
+      return res.status(401).json({
+        message: "Invalid login session.",
+      });
+    }
+
+    const mediaId = String(req.body.mediaId || "").trim();
+    const mediaType = String(req.body.mediaType || "").trim();
+
+    if (!mediaId || !mediaType) {
+      return res.status(400).json({
+        message: "Media ID and media type are required.",
+      });
+    }
+
+    const playlistKey = playlistKeyByType[mediaType];
+
+    if (!playlistKey) {
+      return res.status(400).json({
+        message: "Invalid media type.",
+      });
+    }
+
+    const users = getDB().collection("users");
+    const userId = new ObjectId(req.userId);
+
+    const playlistPath = `playlists.${playlistKey}`;
+
+    const result = await users.updateOne(
+      {
+        _id: userId,
+      },
+      {
+        /*
+         * addToSet prevents the same ID from being added twice.
+         */
+        $addToSet: {
+          [playlistPath]: mediaId,
+        },
+      },
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "Account not found.",
+      });
+    }
+
+    const wasAdded = result.modifiedCount === 1;
+
+    return res.json({
+      message: wasAdded
+        ? "Added to your playlist."
+        : "This item is already in your playlist.",
+      added: wasAdded,
+      playlist: playlistKey,
+      mediaId,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/playlists", requireAuth, async (req, res, next) => {
+  try {
+    if (!ObjectId.isValid(req.userId)) {
+      return res.status(401).json({
+        message: "Invalid login session.",
+      });
+    }
+
+    const user = await getUsersCollection().findOne(
+      {
+        _id: new ObjectId(req.userId),
+      },
+      {
+        projection: {
+          playlists: 1,
+        },
+      },
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "Account not found.",
+      });
+    }
+
+    return res.json({
+      playlists: {
+        movies: user.playlists?.movies || [],
+        tvSeries: user.playlists?.tvSeries || [],
+        music: user.playlists?.music || [],
+        games: user.playlists?.games || [],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/playlists/items", requireAuth, async (req, res, next) => {
+  try {
+    if (!ObjectId.isValid(req.userId)) {
+      return res.status(401).json({
+        message: "Invalid login session.",
+      });
+    }
+
+    const mediaId = String(req.body.mediaId || "").trim();
+    const mediaType = String(req.body.mediaType || "").trim();
+
+    if (!mediaId || !mediaType) {
+      return res.status(400).json({
+        message: "Media ID and media type are required.",
+      });
+    }
+
+    const playlistKey = playlistKeyByType[mediaType];
+
+    if (!playlistKey) {
+      return res.status(400).json({
+        message: "Invalid media type.",
+      });
+    }
+
+    const playlistPath = `playlists.${playlistKey}`;
+
+    const result = await getUsersCollection().updateOne(
+      {
+        _id: new ObjectId(req.userId),
+      },
+      {
+        $pull: {
+          [playlistPath]: mediaId,
+        },
+      },
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "Account not found.",
+      });
+    }
+
+    return res.json({
+      message:
+        result.modifiedCount === 1
+          ? "Removed from your playlist."
+          : "This item was not found in your playlist.",
+      removed: result.modifiedCount === 1,
+      mediaId,
+      playlist: playlistKey,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
