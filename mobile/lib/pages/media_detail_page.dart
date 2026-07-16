@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../services/playlist_store.dart';
+import '../theme/app_colors.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/media_row.dart';
 
@@ -13,6 +16,158 @@ class MediaDetailPage extends StatefulWidget {
 
 class _MediaDetailPageState extends State<MediaDetailPage> {
   int? _userScore;
+  String _userNote = '';
+  bool _loadingEntry = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingEntry();
+  }
+
+  Future<void> _loadExistingEntry() async {
+    try {
+      final userId = await ApiService().getCurrentUserId();
+      if (userId != null) {
+        final entry = await ApiService().getMediaUserEntry(
+          userId: userId,
+          mediaId: widget.item.mediaId,
+        );
+        if (mounted) {
+          setState(() {
+            _userScore = entry['rating'] != null ? (entry['rating'] as double).round() : null;
+            _userNote = entry['note'] as String;
+          });
+        }
+      }
+    } catch (_) {
+      // if the item isn't in the user's playlist yet, or the request
+      // fails, just fall back to the blank/default state silently
+    } finally {
+      if (mounted) setState(() => _loadingEntry = false);
+    }
+  }
+
+  Future<void> _editNote(BuildContext context) async {
+    final controller = TextEditingController(text: _userNote);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Personal Note'),
+        content: TextField(
+          controller: controller,
+          maxLength: 500,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'Write a personal note about this...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return; // cancelled
+
+    try {
+      final userId = await ApiService().getCurrentUserId();
+      if (userId == null) return;
+      await ApiService().updateNote(
+        userId: userId,
+        mediaId: widget.item.mediaId,
+        title: widget.item.title,
+        mediaType: widget.item.mediaType,
+        note: result,
+      );
+      if (mounted) {
+        setState(() => _userNote = result);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Note saved')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save note: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _addToPlaylist() async {
+    final store = PlaylistStore.instance;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text('Add to Playlist', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                const Divider(height: 1),
+                ...store.playlists.keys.map((playlistName) {
+                  return ListTile(
+                    leading: const Icon(Icons.playlist_play, color: AppColors.primary),
+                    title: Text(playlistName),
+                    onTap: () async {
+                      try {
+                        final userId = await ApiService().getCurrentUserId();
+                        if (userId != null) {
+                          await ApiService().addMedia(
+                            userId: userId,
+                            mediaId: widget.item.mediaId,
+                            title: widget.item.title,
+                            mediaType: widget.item.mediaType,
+                          );
+                          store.addItemToPlaylist(playlistName, widget.item);
+                        }
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Added "${widget.item.title}" to $playlistName')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to add to playlist: $e')),
+                          );
+                        }
+                      }
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +241,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               Text(
                 item.genres.join('   '),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54, fontSize: 14),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -103,13 +258,11 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: wire up real playlist logic once a backend exists
-                      },
-                      icon: const Icon(Icons.add, color: Colors.deepPurple),
-                      label: const Text('Playlist', style: TextStyle(color: Colors.deepPurple)),
+                      onPressed: _addToPlaylist,
+                      icon: const Icon(Icons.add, color: AppColors.primary),
+                      label: const Text('Playlist', style: TextStyle(color: AppColors.primary)),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.deepPurple),
+                        side: const BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       ),
@@ -119,12 +272,14 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // TODO: wire up real trailer playback once a source exists
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Trailer playback coming soon')),
+                        );
                       },
                       icon: const Icon(Icons.play_arrow, color: Colors.white),
                       label: const Text('Trailer', style: TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C63C4),
+                        backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       ),
@@ -139,7 +294,18 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Your Score', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: AppColors.accent, size: 20),
+                      const SizedBox(width: 4),
+                      Text(
+                        item.averageRating != null
+                            ? '${item.averageRating!.toStringAsFixed(1)} (${item.ratingCount})'
+                            : 'No ratings yet',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                   Row(
                     children: [
                       Text(
@@ -165,13 +331,39 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               child: item.platforms.isEmpty
                   ? const Text(
                       'Not currently available on any tracked platform.',
-                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                     )
                   : Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: item.platforms.map((platform) => _platformChip(platform)).toList(),
                     ),
+            ),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Personal Note', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    onPressed: () => _editNote(context),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                _userNote.isEmpty ? 'No note yet — tap the pencil to add one.' : _userNote,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  color: _userNote.isEmpty ? AppColors.textSecondary : Colors.black87,
+                  fontStyle: _userNote.isEmpty ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             Padding(
@@ -216,10 +408,20 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
             return IconButton(
               icon: Icon(
                 (_userScore ?? 0) >= score ? Icons.star : Icons.star_border,
-                color: Colors.amber,
+                color: AppColors.accent,
               ),
-              onPressed: () {
-                setState(() => _userScore = score);
+              onPressed: () async {
+                final userId = await ApiService().getCurrentUserId();
+                if (userId != null) {
+                  await ApiService().updateRating(
+                    userId: userId,
+                    mediaId: widget.item.mediaId,
+                    title: widget.item.title,
+                    mediaType: widget.item.mediaType,
+                    newUserRating: score.toDouble(),
+                  );
+                  setState(() => _userScore = score);
+                }
                 Navigator.pop(context);
               },
             );
@@ -279,7 +481,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
   Widget _infoColumn(String label, String value) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Colors.black54)),
+        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
       ],
