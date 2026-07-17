@@ -19,13 +19,12 @@ const requiredEnvironmentVariables = [
   "GOOGLE_CLIENT_ID",
   "TMDB_API_KEY",
   "RAWG_API_KEY",
+  "YOUTUBE_API_KEY",
 ];
 
 for (const variableName of requiredEnvironmentVariables) {
   if (!process.env[variableName]) {
-    throw new Error(
-      `Missing environment variable: ${variableName}`
-    );
+    throw new Error(`Missing environment variable: ${variableName}`);
   }
 }
 
@@ -33,7 +32,7 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -61,9 +60,7 @@ const port = Number(process.env.PORT) || 5000;
 connectDB()
   .then(() => {
     app.listen(port, () => {
-      console.log(
-        `Backend running on http://localhost:${port}`
-      );
+      console.log(`Backend running on http://localhost:${port}`);
     });
   })
   .catch((error) => {
