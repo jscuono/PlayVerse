@@ -255,6 +255,10 @@
   font-size: 13px;
 }
 
+.hero-view{
+  text-decoration: none;
+}
+
 @media (max-width: 900px) {
   .detail-card {
     flex-direction: column;

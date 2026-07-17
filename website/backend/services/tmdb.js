@@ -26,12 +26,48 @@ async function tmdbFetch(path, params = {}) {
 }
 
 function posterUrl(path) {
-  return path ? `${TMDB_IMAGE_BASE}/w500${path}` : "/mockImages/placeholder-poster.png";
+  return path
+    ? `${TMDB_IMAGE_BASE}/w500${path}`
+    : "/mockImages/placeholder-poster.png";
 }
 
 function backdropUrl(path, fallbackPosterPath) {
   if (path) return `${TMDB_IMAGE_BASE}/w1280${path}`;
   return posterUrl(fallbackPosterPath);
+}
+
+function selectYouTubeTrailer(videos = []) {
+  const youtubeVideos = videos.filter(
+    (video) =>
+      video.site === "YouTube" &&
+      typeof video.key === "string" &&
+      video.key.trim(),
+  );
+
+  const selectedVideo =
+    youtubeVideos.find(
+      (video) => video.type === "Trailer" && video.official === true,
+    ) ||
+    youtubeVideos.find((video) => video.type === "Trailer") ||
+    youtubeVideos.find(
+      (video) => video.type === "Teaser" && video.official === true,
+    ) ||
+    youtubeVideos.find((video) => video.type === "Teaser") ||
+    youtubeVideos[0];
+
+  return selectedVideo?.key || "";
+}
+
+async function getTrailerKey(mediaType, id) {
+  try {
+    const data = await tmdbFetch(`/${mediaType}/${id}/videos`);
+
+    return selectYouTubeTrailer(data.results || []);
+  } catch (error) {
+    console.error(`Unable to load TMDB ${mediaType} trailer:`, error.message);
+
+    return "";
+  }
 }
 
 // --- Genres (cached in memory, they basically never change) ---
@@ -195,13 +231,16 @@ async function searchMovies(query, page = 1) {
 }
 
 async function getMovieDetails(id) {
-  const [movie, providers] = await Promise.all([
+  const [movie, providers, trailerKey] = await Promise.all([
     tmdbFetch(`/movie/${id}`),
     getWatchProviders("movie", id),
+    getTrailerKey("movie", id),
   ]);
 
   const normalized = normalizeMovie(movie, new Map());
+
   normalized.providers = providers;
+  normalized.trailerKey = trailerKey;
 
   return normalized;
 }
@@ -252,13 +291,16 @@ async function searchShows(query, page = 1) {
 }
 
 async function getShowDetails(id) {
-  const [show, providers] = await Promise.all([
+  const [show, providers, trailerKey] = await Promise.all([
     tmdbFetch(`/tv/${id}`),
     getWatchProviders("tv", id),
+    getTrailerKey("tv", id),
   ]);
 
   const normalized = normalizeShow(show, new Map());
+
   normalized.providers = providers;
+  normalized.trailerKey = trailerKey;
 
   return normalized;
 }

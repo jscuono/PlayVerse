@@ -41,8 +41,8 @@
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 24px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 24px 0px;
 }
 
 .category-card {
@@ -50,13 +50,13 @@
 }
 
 .category-poster {
-  width: 100%;
+  width: 200px;
+  height: 300px;
   aspect-ratio: 150 / 210;
-  border-radius: 12px;
+  border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
   text-align: center;
 }
 

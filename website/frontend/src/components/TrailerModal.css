@@ -25,12 +25,19 @@
   aspect-ratio: 16 / 9;
 }
 
-.trailer-video iframe {
+.trailer-video iframe,
+.trailer-video video {
   position: absolute;
   inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.trailer-video video {
+  background: #000;
+  object-fit: contain;
 }
 
 .trailer-close {
@@ -53,6 +60,37 @@
 .trailer-close:hover {
   background: rgba(255, 255, 255, 0.9);
   color: black;
+}
+
+.trailer-video.trailer-audio {
+  aspect-ratio: auto;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  box-sizing: border-box;
+  background: rgba(91, 33, 182, 0.7);
+}
+
+.trailer-audio-content {
+  width: min(500px, 100%);
+  text-align: center;
+}
+
+.trailer-audio-content h3 {
+  margin: 0 0 8px;
+  color: white;
+}
+
+.trailer-audio-content p {
+  margin: 0 0 24px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.trailer-audio-content audio {
+  display: block;
+  width: 100%;
 }
 
 @media (max-width: 600px) {

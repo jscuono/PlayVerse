@@ -48,6 +48,10 @@ const heroCopy = {
 };
 
 function getYouTubeVideoKey(item) {
+  if (item?.youtubeVideoKey) {
+    return item.youtubeVideoKey;
+  }
+
   if (item?.trailerKey) {
     return item.trailerKey;
   }
@@ -100,6 +104,14 @@ function MediaDetail() {
   const [trailerOpen, setTrailerOpen] = useState(false);
   const trailerVideoKey = getYouTubeVideoKey(item);
 
+  const musicPreviewUrl = item?.type === "music" ? item.previewUrl || "" : "";
+
+  const canPlayCurrentMedia = Boolean(trailerVideoKey || musicPreviewUrl);
+
+  const gameVideoUrl = item?.type === "game" ? item.previewUrl || "" : "";
+
+  const hasPlayableVideo = Boolean(trailerVideoKey || gameVideoUrl);
+
   useEffect(() => {
     async function loadItem() {
       try {
@@ -110,6 +122,9 @@ function MediaDetail() {
         const { type, sourceId } = parseMediaId(decodedId);
 
         const data = await fetchMediaItem(type, sourceId);
+        console.log("Fetched media item:", data.item);
+        console.log("Trailer key:", data.item?.trailerKey);
+        console.log("Preview URL:", data.item?.previewUrl);
         setItem(data.item);
       } catch (error) {
         setItemError(error.message);
@@ -435,15 +450,58 @@ function MediaDetail() {
                   </>
                 )}
               </button>
-              <button
-                type="button"
-                className="hero-view"
-                onClick={() => setTrailerOpen(true)}
-                disabled={!trailerVideoKey}
-              >
-                <Play size={16} />
-                {trailerVideoKey ? "Trailer" : "Trailer unavailable"}
-              </button>
+              {item.type === "music" ? (
+                canPlayCurrentMedia ? (
+                  <button
+                    type="button"
+                    className="hero-view"
+                    onClick={() => setTrailerOpen(true)}
+                  >
+                    <Play size={16} />
+
+                    {musicPreviewUrl ? "Play Preview" : "Listen on YouTube"}
+                  </button>
+                ) : item.externalUrl ? (
+                  <a
+                    className="hero-view"
+                    href={item.externalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <Play size={16} />
+                    Open in Deezer
+                  </a>
+                ) : (
+                  <button type="button" className="hero-view" disabled>
+                    <Play size={16} />
+                    Music unavailable
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  className="hero-view"
+                  onClick={() => setTrailerOpen(true)}
+                  disabled={!trailerVideoKey}
+                >
+                  <Play size={16} />
+
+                  {trailerVideoKey ? "Trailer" : "Trailer unavailable"}
+                </button>
+              )}
+              {item.type === "music" &&
+                item.externalUrl &&
+                canPlayCurrentMedia && (
+                  <a
+                    className="hero-view"
+                    href={item.externalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in Deezer
+                  </a>
+                )}
             </div>
           </div>
 
@@ -555,10 +613,11 @@ function MediaDetail() {
         />
       )}
 
-      {trailerOpen && trailerVideoKey && (
+      {trailerOpen && canPlayCurrentMedia && (
         <TrailerModal
           title={item.title}
-          videoKey={trailerVideoKey}
+          videoKey={musicPreviewUrl ? "" : trailerVideoKey}
+          audioUrl={musicPreviewUrl}
           onClose={() => setTrailerOpen(false)}
         />
       )}
