@@ -6,7 +6,6 @@ import Account from "./pages/Account.jsx";
 import Search from "./pages/Search.jsx";
 import Playlists from "./pages/Playlists.jsx";
 import CategoryPage from "./pages/CategoryPage.jsx";
-import { movies, shows, music, games } from "./data/mockData.js";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
@@ -22,21 +21,19 @@ function App() {
       <Route path="/playlists" element={<Playlists />} />
       <Route
         path="/movies"
-        element={<CategoryPage navKey="movies" title="Movies" items={movies} />}
+        element={<CategoryPage navKey="movies" title="Movies" />}
       />
       <Route
         path="/shows"
-        element={
-          <CategoryPage navKey="shows" title="TV Series" items={shows} />
-        }
+        element={<CategoryPage navKey="shows" title="TV Series" />}
       />
       <Route
         path="/music"
-        element={<CategoryPage navKey="music" title="Music" items={music} />}
+        element={<CategoryPage navKey="music" title="Music" />}
       />
       <Route
         path="/games"
-        element={<CategoryPage navKey="games" title="Games" items={games} />}
+        element={<CategoryPage navKey="games" title="Games" />}
       />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="*" element={<Navigate to="/" replace />} />

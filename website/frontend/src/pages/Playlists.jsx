@@ -3,47 +3,34 @@ import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 
 import Navbar from "../components/Navbar.jsx";
-import { movies, shows, music, games, allMedia } from "../data/mockData.js";
+import { fetchMediaItem, parseMediaId } from "../utils/api.js";
 
 import "./Playlists.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const categories = [
-  {
-    key: "all",
-    label: "All",
-    items: allMedia,
-  },
-  {
-    key: "movies",
-    label: "Movies",
-    items: movies,
-  },
-  {
-    key: "shows",
-    label: "TV Series",
-    items: shows,
-  },
-  {
-    key: "music",
-    label: "Music",
-    items: music,
-  },
-  {
-    key: "games",
-    label: "Games",
-    items: games,
-  },
+  { key: "all", label: "All" },
+  { key: "movies", label: "Movies" },
+  { key: "shows", label: "TV Series" },
+  { key: "music", label: "Music" },
+  { key: "games", label: "Games" },
 ];
+
+// Maps our normalized singular type ("movie") to the tab key ("movies").
+const typeToCategoryKey = {
+  movie: "movies",
+  show: "shows",
+  music: "music",
+  game: "games",
+};
 
 function Playlists() {
   const navigate = useNavigate();
 
   const [activeCategory, setActiveCategory] = useState("all");
 
-  const [playlistIds, setPlaylistIds] = useState(() => new Set());
-
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState("");
@@ -80,7 +67,20 @@ function Playlists() {
           ...(data.playlists?.games || []),
         ].map(String);
 
-        setPlaylistIds(new Set(ids));
+        // Each stored id looks like "movie-27205" — fetch full details for each.
+        const fetchedItems = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const { type, sourceId } = parseMediaId(id);
+              const result = await fetchMediaItem(type, sourceId);
+              return result.item;
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        setItems(fetchedItems.filter(Boolean));
       } catch (requestError) {
         setError(requestError.message);
       } finally {
@@ -91,13 +91,10 @@ function Playlists() {
     loadPlaylists();
   }, [navigate]);
 
-  const category = categories.find(
-    (currentCategory) => currentCategory.key === activeCategory,
-  );
-
-  const items = useMemo(() => {
-    return category.items.filter((item) => playlistIds.has(String(item.id)));
-  }, [category, playlistIds]);
+  const filteredItems = useMemo(() => {
+    if (activeCategory === "all") return items;
+    return items.filter((item) => typeToCategoryKey[item.type] === activeCategory);
+  }, [items, activeCategory]);
 
   async function handleRemove(item) {
     try {
@@ -132,11 +129,9 @@ function Playlists() {
         );
       }
 
-      setPlaylistIds((previousIds) => {
-        const nextIds = new Set(previousIds);
-        nextIds.delete(String(item.id));
-        return nextIds;
-      });
+      setItems((previousItems) =>
+        previousItems.filter((existing) => existing.id !== item.id),
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -178,14 +173,14 @@ function Playlists() {
 
         {loading ? (
           <p className="playlists-empty">Loading your playlists...</p>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <p className="playlists-empty">
             Nothing here yet. Add movies, shows, music, or games from their
             detail page.
           </p>
         ) : (
           <div className="playlists-grid">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <div className="playlist-card" key={item.id}>
                 <button
                   type="button"
