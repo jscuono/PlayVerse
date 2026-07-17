@@ -1,5 +1,5 @@
 const { badge } = require("./providers");
-
+const { findGameTrailer } = require("./youtube");
 const RAWG_BASE = "https://api.rawg.io/api";
 const PAGE_SIZE = 20;
 
@@ -54,6 +54,30 @@ function normalizeGame(game) {
   };
 }
 
+function selectGameVideo(videos = []) {
+  const selectedVideo = videos.find(
+    (video) => video?.data?.max || video?.data?.["480"],
+  );
+
+  if (!selectedVideo) {
+    return "";
+  }
+
+  return selectedVideo.data?.max || selectedVideo.data?.["480"] || "";
+}
+
+async function getGamePreviewUrl(id) {
+  try {
+    const data = await rawgFetch(`/games/${id}/movies`);
+
+    return selectGameVideo(data.results || []);
+  } catch (error) {
+    console.warn(`Unable to load RAWG video for game ${id}:`, error.message);
+
+    return "";
+  }
+}
+
 async function getGameGenres() {
   const data = await rawgFetch("/genres");
   return data.results.map((g) => ({ id: g.slug, name: g.name }));
@@ -104,7 +128,23 @@ async function searchGames(query, page = 1) {
 
 async function getGameDetails(id) {
   const game = await rawgFetch(`/games/${id}`);
-  return normalizeGame(game);
+
+  let trailerKey = "";
+
+  try {
+    trailerKey = await findGameTrailer(game.name, game.released);
+  } catch (error) {
+    console.warn(
+      `Unable to find a YouTube trailer for ${game.name}:`,
+      error.message,
+    );
+  }
+
+  const normalized = normalizeGame(game);
+
+  normalized.trailerKey = trailerKey;
+
+  return normalized;
 }
 
 module.exports = {

@@ -1,0 +1,104 @@
+.trailer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.trailer-modal {
+  position: relative;
+  width: min(900px, 95vw);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #111;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+}
+
+.trailer-video {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.trailer-video iframe,
+.trailer-video video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.trailer-video video {
+  background: #000;
+  object-fit: contain;
+}
+
+.trailer-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  cursor: pointer;
+}
+
+.trailer-close:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: black;
+}
+
+.trailer-video.trailer-audio {
+  aspect-ratio: auto;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  box-sizing: border-box;
+  background: rgba(91, 33, 182, 0.7);
+}
+
+.trailer-audio-content {
+  width: min(500px, 100%);
+  text-align: center;
+}
+
+.trailer-audio-content h3 {
+  margin: 0 0 8px;
+  color: white;
+}
+
+.trailer-audio-content p {
+  margin: 0 0 24px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.trailer-audio-content audio {
+  display: block;
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .trailer-overlay {
+    padding: 12px;
+  }
+
+  .trailer-modal {
+    border-radius: 12px;
+  }
+}

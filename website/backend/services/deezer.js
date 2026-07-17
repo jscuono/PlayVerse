@@ -1,4 +1,5 @@
 const { badge } = require("./providers");
+const { findMusicVideo } = require("./youtube");
 
 const DEEZER_BASE = "https://api.deezer.com";
 
@@ -41,8 +42,7 @@ function normalizeTrack(track) {
       track.album?.cover_big ||
       track.album?.cover_medium ||
       "/mockImages/placeholder-poster.png",
-    backdropImage:
-      track.album?.cover_xl || track.album?.cover_big || null,
+    backdropImage: track.album?.cover_xl || track.album?.cover_big || null,
     genres: [],
     genre: track.album?.title || "Single",
     date: track.release_date || "Unknown",
@@ -53,8 +53,9 @@ function normalizeTrack(track) {
     description: `"${track.title}" by ${
       track.artist?.name || "Unknown Artist"
     }, from the album ${track.album?.title || "Unknown Album"}.`,
-    score: null,
     previewUrl: track.preview || null,
+    externalUrl: track.link || null,
+    youtubeVideoKey: null,
     providers: [badge("deezer")],
   };
 }
@@ -99,7 +100,24 @@ async function searchTracks(query, limit = 25) {
 
 async function getTrackDetails(id) {
   const track = await deezerFetch(`/track/${id}`);
-  return normalizeTrack(track);
+
+  const normalized = normalizeTrack(track);
+
+  if (!normalized.previewUrl) {
+    try {
+      normalized.youtubeVideoKey = await findMusicVideo(
+        track.title_short || track.title,
+        track.artist?.name || "",
+      );
+    } catch (error) {
+      console.warn(
+        `Unable to find music video for ${track.title}:`,
+        error.message,
+      );
+    }
+  }
+
+  return normalized;
 }
 
 module.exports = {
