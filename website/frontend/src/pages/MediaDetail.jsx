@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight,
@@ -11,13 +11,12 @@ import {
   Tag,
   Globe,
   Database,
-  Calendar,
   CalendarDays,
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import RatingModal from "../components/RatingModal.jsx";
-import { getMediaById } from "../data/mockData.js";
 import TrailerModal from "../components/TrailerModal.jsx";
+import { fetchMediaItem, parseMediaId } from "../utils/api.js";
 import "./MediaDetail.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -48,10 +47,44 @@ const heroCopy = {
   ],
 };
 
+function getYouTubeVideoKey(item) {
+  if (item?.trailerKey) {
+    return item.trailerKey;
+  }
+
+  if (!item?.previewUrl) {
+    return "";
+  }
+
+  try {
+    const url = new URL(item.previewUrl);
+    const hostname = url.hostname.replace("www.", "");
+
+    if (hostname === "youtu.be") {
+      return url.pathname.split("/").filter(Boolean)[0] || "";
+    }
+
+    if (hostname === "youtube.com" || hostname === "youtube-nocookie.com") {
+      if (url.pathname.startsWith("/embed/")) {
+        return url.pathname.split("/embed/")[1]?.split("/")[0] || "";
+      }
+
+      return url.searchParams.get("v") || "";
+    }
+  } catch (error) {
+    console.error("Invalid trailer URL:", error);
+  }
+
+  return "";
+}
+
 function MediaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const item = useMemo(() => getMediaById(decodeURIComponent(id ?? "")), [id]);
+
+  const [item, setItem] = useState(null);
+  const [itemLoading, setItemLoading] = useState(true);
+  const [itemError, setItemError] = useState("");
 
   const [rating, setRating] = useState(0);
   const [ratingNote, setRatingNote] = useState("");
@@ -65,11 +98,31 @@ function MediaDetail() {
   const [playlistMessage, setPlaylistMessage] = useState("");
   const [playlistError, setPlaylistError] = useState("");
   const [trailerOpen, setTrailerOpen] = useState(false);
+  const trailerVideoKey = getYouTubeVideoKey(item);
 
   useEffect(() => {
-    if (!item) {
-      return;
+    async function loadItem() {
+      try {
+        setItemLoading(true);
+        setItemError("");
+
+        const decodedId = decodeURIComponent(id ?? "");
+        const { type, sourceId } = parseMediaId(decodedId);
+
+        const data = await fetchMediaItem(type, sourceId);
+        setItem(data.item);
+      } catch (error) {
+        setItemError(error.message);
+      } finally {
+        setItemLoading(false);
+      }
     }
+
+    loadItem();
+  }, [id]);
+
+  useEffect(() => {
+    if (!item) return;
 
     async function loadPlaylistStatus() {
       try {
@@ -103,7 +156,6 @@ function MediaDetail() {
         };
 
         const playlistKey = playlistKeyByType[item.type];
-
         const savedIds = (data.playlists?.[playlistKey] || []).map(String);
 
         setInPlaylist(savedIds.includes(String(item.id)));
@@ -156,12 +208,25 @@ function MediaDetail() {
     loadRating();
   }, [item, navigate]);
 
-  if (!item) {
+  if (itemLoading) {
     return (
       <div className="home-page">
-        <Navbar activeNav="home" onNavChange={() => navigate("/home")} />
+        <Navbar activeNav="home" />
         <main className="detail-missing">
-          <p>We couldn&apos;t find that title.</p>
+          <p>Loading...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (itemError || !item) {
+    return (
+      <div className="home-page">
+        <Navbar activeNav="home" />
+        <main className="detail-missing">
+          <p>
+            We couldn&apos;t find that title{itemError ? `: ${itemError}` : "."}
+          </p>
           <button
             type="button"
             className="hero-view"
@@ -317,10 +382,7 @@ function MediaDetail() {
 
   return (
     <div className="home-page">
-      <Navbar
-        activeNav={navKeyByType[item.type]}
-        onNavChange={(key) => navigate(key === "home" ? "/home" : "/home")}
-      />
+      <Navbar activeNav={navKeyByType[item.type]} />
 
       <div
         className="detail-hero"
@@ -377,11 +439,10 @@ function MediaDetail() {
                 type="button"
                 className="hero-view"
                 onClick={() => setTrailerOpen(true)}
-                disabled={!item.trailerKey}
+                disabled={!trailerVideoKey}
               >
                 <Play size={16} />
-
-                {item.trailerKey ? "Trailer" : "Trailer unavailable"}
+                {trailerVideoKey ? "Trailer" : "Trailer unavailable"}
               </button>
             </div>
           </div>
@@ -418,7 +479,12 @@ function MediaDetail() {
             <div className="detail-watch">
               <span>How To Watch</span>
               <div className="provider-row">
-                {item.providers.map((p) => (
+                {(item.providers || []).length === 0 && (
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>
+                    No providers found
+                  </span>
+                )}
+                {(item.providers || []).map((p) => (
                   <span
                     key={p.key}
                     className="provider-badge"
@@ -489,10 +555,10 @@ function MediaDetail() {
         />
       )}
 
-      {trailerOpen && item.trailerKey && (
+      {trailerOpen && trailerVideoKey && (
         <TrailerModal
           title={item.title}
-          videoKey={item.trailerKey}
+          videoKey={trailerVideoKey}
           onClose={() => setTrailerOpen(false)}
         />
       )}
