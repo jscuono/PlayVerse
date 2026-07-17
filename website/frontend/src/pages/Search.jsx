@@ -1,50 +1,77 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search as SearchIcon, ChevronDown } from 'lucide-react'
-import Navbar from '../components/Navbar.jsx'
-import { movies, shows, music, games } from '../data/mockData.js'
-import './Search.css'
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search as SearchIcon, ChevronDown } from "lucide-react";
+import Navbar from "../components/Navbar.jsx";
+import { CATEGORY_FETCHERS, searchMedia } from "../utils/api.js";
+import "./Search.css";
 
 const categories = [
-  { key: 'movies', label: 'Movies', items: movies },
-  { key: 'shows', label: 'TV Series', items: shows },
-  { key: 'music', label: 'Music', items: music },
-  { key: 'games', label: 'Games', items: games },
-]
+  { key: "movies", label: "Movies" },
+  { key: "shows", label: "TV Series" },
+  { key: "music", label: "Music" },
+  { key: "games", label: "Games" },
+];
 
 const sortOptions = [
-  { key: 'popularity', label: 'Popularity' },
-  { key: 'recent', label: 'Recent' },
-  { key: 'trending', label: 'Trending' },
-]
+  { key: "popularity", label: "Popularity" },
+  { key: "recent", label: "Recent" },
+  { key: "trending", label: "Trending" },
+];
 
 function Search() {
-  const navigate = useNavigate()
-  const [activeCategory, setActiveCategory] = useState('movies')
-  const [query, setQuery] = useState('')
-  const [sortBy, setSortBy] = useState('popularity')
-  const [sortOpen, setSortOpen] = useState(false)
+  const navigate = useNavigate();
+  const [activeCategory, setActiveCategory] = useState("movies");
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("popularity");
+  const [sortOpen, setSortOpen] = useState(false);
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const category = categories.find((c) => c.key === activeCategory)
-  const sortLabel = sortOptions.find((s) => s.key === sortBy)?.label
+  const sortLabel = sortOptions.find((s) => s.key === sortBy)?.label;
 
-  const results = useMemo(() => {
-    const list = category.items
-    const filtered = query.trim()
-      ? list.filter((item) => item.title.toLowerCase().includes(query.trim().toLowerCase()))
-      : list
+  useEffect(() => {
+    let cancelled = false;
 
-    if (sortBy === 'recent') {
-      return [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1))
+    async function loadResults() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const trimmedQuery = query.trim();
+
+        const data = trimmedQuery
+          ? await searchMedia({ type: activeCategory, query: trimmedQuery })
+          : await CATEGORY_FETCHERS[activeCategory]();
+
+        if (cancelled) return;
+
+        let items = data.items;
+
+        if (sortBy === "recent") {
+          items = [...items].sort((a, b) => (a.date < b.date ? 1 : -1));
+        } else if (sortBy === "trending") {
+          items = [...items].reverse();
+        }
+
+        setResults(items);
+      } catch (requestError) {
+        if (!cancelled) setError(requestError.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    if (sortBy === 'trending') {
-      return [...filtered].reverse()
-    }
-    return filtered
-  }, [category, query, sortBy])
+
+    const timeoutId = setTimeout(loadResults, 300); // debounce typing
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [activeCategory, query, sortBy]);
 
   function openMedia(item) {
-    navigate(`/media/${encodeURIComponent(item.id)}`)
+    navigate(`/media/${encodeURIComponent(item.id)}`);
   }
 
   return (
@@ -60,7 +87,7 @@ function Search() {
             <div className="search-input">
               <input
                 type="text"
-                placeholder="Search title, streaming service, etc..."
+                placeholder="Search title, artist, etc..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -72,7 +99,7 @@ function Search() {
                 <button
                   key={c.key}
                   type="button"
-                  className={activeCategory === c.key ? 'search-tab active' : 'search-tab'}
+                  className={activeCategory === c.key ? "search-tab active" : "search-tab"}
                   onClick={() => setActiveCategory(c.key)}
                 >
                   {c.label}
@@ -91,10 +118,10 @@ function Search() {
                   <button
                     key={opt.key}
                     type="button"
-                    className={sortBy === opt.key ? 'sort-option active' : 'sort-option'}
+                    className={sortBy === opt.key ? "sort-option active" : "sort-option"}
                     onClick={() => {
-                      setSortBy(opt.key)
-                      setSortOpen(false)
+                      setSortBy(opt.key);
+                      setSortOpen(false);
                     }}
                   >
                     {opt.label}
@@ -105,7 +132,11 @@ function Search() {
           </div>
         </div>
 
-        {results.length === 0 ? (
+        {loading ? (
+          <p className="search-empty">Loading...</p>
+        ) : error ? (
+          <p className="search-empty">Couldn&apos;t search: {error}</p>
+        ) : results.length === 0 ? (
           <p className="search-empty">No results for &quot;{query}&quot;.</p>
         ) : (
           <div className="search-grid">
@@ -116,10 +147,10 @@ function Search() {
                 onClick={() => openMedia(item)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && openMedia(item)}
+                onKeyDown={(e) => e.key === "Enter" && openMedia(item)}
               >
-                <div className="search-poster" style={{ background: item.gradient }}>
-                  <span>{item.title}</span>
+                <div className="search-poster">
+                  <img src={item.posterImage} alt={`${item.title} poster`} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "12px" }} />
                 </div>
                 <p>{item.title}</p>
               </div>
@@ -128,7 +159,7 @@ function Search() {
         )}
       </main>
     </div>
-  )
+  );
 }
 
-export default Search
+export default Search;

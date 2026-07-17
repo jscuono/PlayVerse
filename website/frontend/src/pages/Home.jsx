@@ -9,7 +9,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
-import { movies, shows, music, games, heroSlides } from "../data/mockData.js";
+import { fetchMovies, fetchShows, fetchMusic, fetchGames, fetchHero } from "../utils/api.js";
 import "./Home.css";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -19,6 +19,8 @@ function MediaRow({ title, items, onSelect }) {
   function scroll(dir) {
     scrollerRef.current?.scrollBy({ left: dir * 500, behavior: "smooth" });
   }
+
+  if (!items || items.length === 0) return null;
 
   return (
     <section className="media-row">
@@ -64,6 +66,14 @@ function MediaRow({ title, items, onSelect }) {
 
 function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
+  const [heroSlides, setHeroSlides] = useState([]);
+  const [movies, setMovies] = useState([]);
+  const [shows, setShows] = useState([]);
+  const [music, setMusic] = useState([]);
+  const [games, setGames] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
+
   const [addingMediaId, setAddingMediaId] = useState(null);
   const [addedMediaIds, setAddedMediaIds] = useState(() => new Set());
   const [playlistMessage, setPlaylistMessage] = useState("");
@@ -73,7 +83,37 @@ function Home() {
   const navigate = useNavigate();
 
   const hero = heroSlides[heroIndex];
-  const heroIsInPlaylist = addedMediaIds.has(String(hero.id));
+  const heroIsInPlaylist = hero ? addedMediaIds.has(String(hero.id)) : false;
+
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        setCatalogLoading(true);
+        setCatalogError("");
+
+        const [moviesResult, showsResult, musicResult, gamesResult, heroResult] =
+          await Promise.all([
+            fetchMovies(),
+            fetchShows(),
+            fetchMusic(),
+            fetchGames(),
+            fetchHero(),
+          ]);
+
+        setMovies(moviesResult.items);
+        setShows(showsResult.items);
+        setMusic(musicResult.items);
+        setGames(gamesResult.items);
+        setHeroSlides(heroResult.items);
+      } catch (error) {
+        setCatalogError(error.message);
+      } finally {
+        setCatalogLoading(false);
+      }
+    }
+
+    loadCatalog();
+  }, []);
 
   useEffect(() => {
     async function loadPlaylists() {
@@ -230,98 +270,126 @@ function Home() {
     }
   }
 
+  if (catalogLoading) {
+    return (
+      <div className="home-page">
+        <Navbar activeNav="home" />
+        <main>
+          <p>Loading PlayVerse...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (catalogError) {
+    return (
+      <div className="home-page">
+        <Navbar activeNav="home" />
+        <main>
+          <p>Couldn&apos;t load the catalog: {catalogError}</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="home-page">
       <Navbar activeNav="home" />
 
       <main>
-        <section className="hero">
-          <div className="hero-info">
-            <span className="hero-tag">{hero.tag}</span>
-            <h1>{hero.title}</h1>
-            <p className="hero-genre">{hero.genres.join(" • ")}</p>
-            <div className="hero-meta">
-              <span>
-                <Calendar size={14} /> {hero.date}
-              </span>
-              <span>
-                <Clock size={14} /> {hero.duration}
-              </span>
-            </div>
-            <p className="hero-desc">{hero.description}</p>
-            <div className="hero-actions">
-              <button
-                type="button"
-                className="hero-view"
-                onClick={() => openMedia(hero)}
-              >
-                View <ChevronRight size={16} />
-              </button>
-              <button
-                type="button"
-                className="hero-playlist"
-                onClick={() => handlePlaylistClick(hero)}
-                disabled={playlistsLoading || addingMediaId === hero.id}
-              >
-                {playlistsLoading ? (
-                  "Loading..."
-                ) : addingMediaId === hero.id ? (
-                  heroIsInPlaylist ? (
-                    "Removing..."
-                  ) : (
-                    "Adding..."
-                  )
-                ) : heroIsInPlaylist ? (
-                  <>
-                    <Check size={16} />
-                    Remove
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} />
-                    Playlist
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+        {hero && (
+          <>
+            <section className="hero">
+              <div className="hero-info">
+                <span className="hero-tag">{hero.tag}</span>
+                <h1>{hero.title}</h1>
+                <p className="hero-genre">{hero.genre || hero.genres?.join(" • ")}</p>
+                <div className="hero-meta">
+                  <span>
+                    <Calendar size={14} /> {hero.date}
+                  </span>
+                  <span>
+                    <Clock size={14} /> {hero.duration}
+                  </span>
+                </div>
+                <p className="hero-desc">{hero.description}</p>
+                <div className="hero-actions">
+                  <button
+                    type="button"
+                    className="hero-view"
+                    onClick={() => openMedia(hero)}
+                  >
+                    View <ChevronRight size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="hero-playlist"
+                    onClick={() => handlePlaylistClick(hero)}
+                    disabled={playlistsLoading || addingMediaId === hero.id}
+                  >
+                    {playlistsLoading ? (
+                      "Loading..."
+                    ) : addingMediaId === hero.id ? (
+                      heroIsInPlaylist ? (
+                        "Removing..."
+                      ) : (
+                        "Adding..."
+                      )
+                    ) : heroIsInPlaylist ? (
+                      <>
+                        <Check size={16} />
+                        Remove
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={16} />
+                        Playlist
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
 
-          <div
-            className="hero-image"
-            style={{
-              backgroundImage: `url("${hero.backdropImage}")`,
-            }}
-          >
-            <button
-              type="button"
-              className="hero-arrow left"
-              onClick={() => changeHero(-1)}
-              aria-label="Previous"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              type="button"
-              className="hero-arrow right"
-              onClick={() => changeHero(1)}
-              aria-label="Next"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
-        </section>
+              <div
+                className="hero-image"
+                style={{
+                  backgroundImage: `url("${hero.backdropImage}")`,
+                }}
+              >
+                <button
+                  type="button"
+                  className="hero-arrow left"
+                  onClick={() => changeHero(-1)}
+                  aria-label="Previous"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  className="hero-arrow right"
+                  onClick={() => changeHero(1)}
+                  aria-label="Next"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </section>
 
-        <div className="hero-dots">
-          {heroSlides.map((slide, i) => (
-            <button
-              key={slide.id}
-              type="button"
-              className={i === heroIndex ? "dot active" : "dot"}
-              onClick={() => setHeroIndex(i)}
-              aria-label={`Slide ${i + 1}`}
-            />
-          ))}
-        </div>
+            <div className="hero-dots">
+              {heroSlides.map((slide, i) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  className={i === heroIndex ? "dot active" : "dot"}
+                  onClick={() => setHeroIndex(i)}
+                  aria-label={`Slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {playlistError && <p className="account-error">{playlistError}</p>}
 
         <MediaRow title="Popular Movies" items={movies} onSelect={openMedia} />
         <MediaRow title="Popular Shows" items={shows} onSelect={openMedia} />
@@ -331,7 +399,5 @@ function Home() {
     </div>
   );
 }
-
-
 
 export default Home;
