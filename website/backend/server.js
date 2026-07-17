@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 
 const { connectDB } = require("./db");
 const authRoutes = require("./authRoutes");
+const mediaRoutes = require("./mediaRoutes");
 
 const app = express();
 
@@ -16,6 +17,8 @@ const requiredEnvironmentVariables = [
   "SENDGRID_API_KEY",
   "SENDGRID_FROM_EMAIL",
   "GOOGLE_CLIENT_ID",
+  "TMDB_API_KEY",
+  "RAWG_API_KEY",
 ];
 
 for (const variableName of requiredEnvironmentVariables) {
@@ -43,6 +46,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/media", mediaRoutes);
 
 app.use((error, req, res, next) => {
   console.error(error);

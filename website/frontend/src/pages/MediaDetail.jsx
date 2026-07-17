@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight,
@@ -11,12 +11,11 @@ import {
   Tag,
   Globe,
   Database,
-  Calendar,
   CalendarDays,
 } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import RatingModal from "../components/RatingModal.jsx";
-import { getMediaById } from "../data/mockData.js";
+import { fetchMediaItem, parseMediaId } from "../utils/api.js";
 import "./MediaDetail.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -54,7 +53,10 @@ function ratingKey(id) {
 function MediaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const item = useMemo(() => getMediaById(decodeURIComponent(id ?? "")), [id]);
+
+  const [item, setItem] = useState(null);
+  const [itemLoading, setItemLoading] = useState(true);
+  const [itemError, setItemError] = useState("");
 
   const [rating, setRating] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,12 +67,30 @@ function MediaDetail() {
   const [playlistError, setPlaylistError] = useState("");
 
   useEffect(() => {
-    if (!item) {
-      return;
+    async function loadItem() {
+      try {
+        setItemLoading(true);
+        setItemError("");
+
+        const decodedId = decodeURIComponent(id ?? "");
+        const { type, sourceId } = parseMediaId(decodedId);
+
+        const data = await fetchMediaItem(type, sourceId);
+        setItem(data.item);
+      } catch (error) {
+        setItemError(error.message);
+      } finally {
+        setItemLoading(false);
+      }
     }
 
-    const storedRating = window.localStorage.getItem(ratingKey(item.id));
+    loadItem();
+  }, [id]);
 
+  useEffect(() => {
+    if (!item) return;
+
+    const storedRating = window.localStorage.getItem(ratingKey(item.id));
     setRating(storedRating ? Number(storedRating) : 0);
 
     async function loadPlaylistStatus() {
@@ -105,7 +125,6 @@ function MediaDetail() {
         };
 
         const playlistKey = playlistKeyByType[item.type];
-
         const savedIds = (data.playlists?.[playlistKey] || []).map(String);
 
         setInPlaylist(savedIds.includes(String(item.id)));
@@ -119,12 +138,23 @@ function MediaDetail() {
     loadPlaylistStatus();
   }, [item, navigate]);
 
-  if (!item) {
+  if (itemLoading) {
     return (
       <div className="home-page">
-        <Navbar activeNav="home" onNavChange={() => navigate("/home")} />
+        <Navbar activeNav="home" />
         <main className="detail-missing">
-          <p>We couldn&apos;t find that title.</p>
+          <p>Loading...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (itemError || !item) {
+    return (
+      <div className="home-page">
+        <Navbar activeNav="home" />
+        <main className="detail-missing">
+          <p>We couldn&apos;t find that title{itemError ? `: ${itemError}` : "."}</p>
           <button
             type="button"
             className="hero-view"
@@ -241,10 +271,7 @@ function MediaDetail() {
 
   return (
     <div className="home-page">
-      <Navbar
-        activeNav={navKeyByType[item.type]}
-        onNavChange={(key) => navigate(key === "home" ? "/home" : "/home")}
-      />
+      <Navbar activeNav={navKeyByType[item.type]} />
 
       <div
         className="detail-hero"
@@ -297,9 +324,20 @@ function MediaDetail() {
                   </>
                 )}
               </button>
-              <button type="button" className="hero-view">
-                <Play size={16} /> Trailer
-              </button>
+              {item.previewUrl ? (
+                <a
+                  className="hero-view"
+                  href={item.previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Play size={16} /> Preview
+                </a>
+              ) : (
+                <button type="button" className="hero-view">
+                  <Play size={16} /> Trailer
+                </button>
+              )}
             </div>
           </div>
 
@@ -325,7 +363,10 @@ function MediaDetail() {
             <div className="detail-watch">
               <span>How To Watch</span>
               <div className="provider-row">
-                {item.providers.map((p) => (
+                {(item.providers || []).length === 0 && (
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>No providers found</span>
+                )}
+                {(item.providers || []).map((p) => (
                   <span
                     key={p.key}
                     className="provider-badge"
