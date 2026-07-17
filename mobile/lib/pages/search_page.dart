@@ -3,6 +3,7 @@ import '../data/media_catalog.dart';
 import '../services/playlist_store.dart';
 import '../theme/app_colors.dart';
 import '../widgets/media_row.dart';
+import 'ai_search_page.dart';
 import 'all_media_page.dart';
 
 class SearchPage extends StatefulWidget {
@@ -80,6 +81,19 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Ask AI',
+            icon: const Icon(Icons.auto_awesome, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AiSearchPage()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: _query.isEmpty
           ? const Center(
