@@ -19,7 +19,8 @@ const requiredEnvironmentVariables = [
   "GOOGLE_CLIENT_ID",
   "TMDB_API_KEY",
   "RAWG_API_KEY",
-  "YOUTUBE_API_KEY",
+  //"GEMINI_API_KEY"
+  //"YOUTUBE_API_KEY",
 ];
 
 for (const variableName of requiredEnvironmentVariables) {
@@ -56,6 +57,10 @@ app.use((error, req, res, next) => {
 });
 
 const port = Number(process.env.PORT) || 5000;
+
+//Groq Ai
+const recommendationRoutes = require('./services/groqRecom');
+app.use('/api/recommendations', recommendationRoutes);
 
 connectDB()
   .then(() => {
