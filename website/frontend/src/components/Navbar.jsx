@@ -8,6 +8,7 @@ import {
   Music2,
   Gamepad2,
   Search,
+  Sparkles,
   ChevronDown,
   User,
   ListPlus,
@@ -48,6 +49,12 @@ export const navItems = [
     label: "Games",
     icon: Gamepad2,
     path: "/games",
+  },
+  {
+    key: "ai",
+    label: "Ask AI",
+    icon: Sparkles,
+    path: "/ai",
   },
 ];
 

@@ -9,6 +9,7 @@ import CategoryPage from "./pages/CategoryPage.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
+import AIChat from "./pages/AIChat.jsx";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/account" element={<Account />} />
       <Route path="/search" element={<Search />} />
       <Route path="/playlists" element={<Playlists />} />
+      <Route path="/ai" element={<AIChat />} />
       <Route
         path="/movies"
         element={<CategoryPage navKey="movies" title="Movies" />}
