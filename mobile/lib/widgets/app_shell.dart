@@ -158,15 +158,21 @@ class _AppShellState extends State<AppShell> with RouteAware {
             GestureDetector(
               onTap: _toggleProfileMenu,
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  FutureBuilder<String>(
-                    future: _getUserName(),
-                    builder: (context, snapshot) {
-                      return Text(
-                        snapshot.data ?? 'Jane Doe',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                      );
-                    },
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 90),
+                    child: FutureBuilder<String>(
+                      future: _getUserName(),
+                      builder: (context, snapshot) {
+                        return Text(
+                          snapshot.data ?? 'Jane Doe',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                        );
+                      },
+                    ),
                   ),
                   const Icon(Icons.arrow_drop_down, color: Colors.white),
                 ],
