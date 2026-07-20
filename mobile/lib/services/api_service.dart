@@ -7,7 +7,7 @@ class ApiService {
   ApiService._internal();
 
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://playverseapp.onrender.com',
+    baseUrl: 'https://playverseapp.onrender.com/api',
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
   ));
