@@ -14,8 +14,6 @@ function PlaylistPickerModal({ item, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
-  const [likedPlaylistIn, setLikedPlaylistIn] = useState(false);
-  const [likedPlaylistUpdating, setLikedPlaylistUpdating] = useState(false);
 
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -30,45 +28,23 @@ function PlaylistPickerModal({ item, onClose }) {
       setLoading(true);
       setError("");
 
-      const [customResponse, quickResponse] = await Promise.all([
-        fetch(`${API_URL}/api/auth/custom-playlists`, {
-          method: "GET",
-          credentials: "include",
-        }),
-        fetch(`${API_URL}/api/auth/playlists`, {
-          method: "GET",
-          credentials: "include",
-        }),
-      ]);
+      const response = await fetch(`${API_URL}/api/auth/custom-playlists`, {
+        method: "GET",
+        credentials: "include",
+      });
 
-      const customData = await customResponse.json();
-      const quickData = await quickResponse.json();
+      const data = await response.json();
 
-      if (customResponse.status === 401 || quickResponse.status === 401) {
+      if (response.status === 401) {
         navigate("/login", { replace: true });
         return;
       }
 
-      if (!customResponse.ok) {
-        throw new Error(customData.message || "Unable to load your playlists.");
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load your playlists.");
       }
 
-      if (!quickResponse.ok) {
-        throw new Error(quickData.message || "Unable to load your liked playlist.");
-      }
-
-      const playlistKeyByType = {
-        movie: "movies",
-        show: "tvSeries",
-        music: "music",
-        game: "games",
-      };
-
-      const quickKey = playlistKeyByType[item.type] || "movies";
-      const savedIds = (quickData.playlists?.[quickKey] || []).map(String);
-
-      setPlaylists(customData.playlists || []);
-      setLikedPlaylistIn(savedIds.includes(String(item.id)));
+      setPlaylists(data.playlists || []);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -80,37 +56,6 @@ function PlaylistPickerModal({ item, onClose }) {
     return (playlist.items || []).some(
       (entry) => entry.mediaId === String(item.id) && entry.mediaType === item.type,
     );
-  }
-
-  async function toggleLikedPlaylist() {
-    try {
-      setLikedPlaylistUpdating(true);
-      setError("");
-
-      const response = await fetch(`${API_URL}/api/auth/playlists/items`, {
-        method: likedPlaylistIn ? "DELETE" : "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ mediaId: String(item.id), mediaType: item.type }),
-      });
-
-      const data = await response.json();
-
-      if (response.status === 401) {
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(data.message || "Unable to update your liked playlist.");
-      }
-
-      setLikedPlaylistIn((prev) => !prev);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLikedPlaylistUpdating(false);
-    }
   }
 
   async function toggle(playlist) {
@@ -239,21 +184,6 @@ function PlaylistPickerModal({ item, onClose }) {
           <p className="playlists-empty">Loading your playlists...</p>
         ) : (
           <ul className="playlist-picker-list">
-            <li>
-              <button
-                type="button"
-                className={likedPlaylistIn ? "playlist-picker-row active" : "playlist-picker-row"}
-                onClick={toggleLikedPlaylist}
-                disabled={likedPlaylistUpdating}
-              >
-                <span className={likedPlaylistIn ? "playlist-picker-check checked" : "playlist-picker-check"}>
-                  {likedPlaylistIn && <Check size={14} />}
-                </span>
-                <span className="playlist-picker-name">Playlist</span>
-                <span className="playlist-picker-count">Legacy</span>
-              </button>
-            </li>
-
             {playlists.length === 0 ? (
               <li>
                 <p className="playlists-empty">

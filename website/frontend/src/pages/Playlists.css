@@ -1,3 +1,8 @@
+
+.playlists-page {
+  background: var(--pv-bg);
+}
+
 .playlists-main {
   max-width: 1400px;
   margin: 0 auto;

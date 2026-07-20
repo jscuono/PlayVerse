@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Plus, Pencil, Trash2 } from "lucide-react";
 
@@ -9,21 +9,6 @@ import "./Playlists.css";
 import "../components/AccountModal.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const categories = [
-  { key: "all", label: "All" },
-  { key: "movies", label: "Movies" },
-  { key: "shows", label: "TV Series" },
-  { key: "music", label: "Music" },
-  { key: "games", label: "Games" },
-];
-
-const typeToCategoryKey = {
-  movie: "movies",
-  show: "shows",
-  music: "music",
-  game: "games",
-};
 
 async function resolvePlaylistItems(entries) {
   const validMediaIds = [...new Set(
@@ -75,13 +60,6 @@ async function resolvePlaylistItems(entries) {
 function Playlists() {
   const navigate = useNavigate();
 
-  // ---- Quick Playlist (original, single, category-based playlist) ----
-  const [activeCategory, setActiveCategory] = useState("all");
-  const [quickItems, setQuickItems] = useState([]);
-  const [quickLoading, setQuickLoading] = useState(true);
-  const [removingId, setRemovingId] = useState(null);
-  const [quickError, setQuickError] = useState("");
-
   // ---- Custom, named playlists (mix movies/shows/music/games) ----
   // Each entry: { id, name, items: [{mediaId, mediaType}], resolvedItems: [fullMediaItem] }
   const [customPlaylists, setCustomPlaylists] = useState([]);
@@ -101,47 +79,6 @@ function Playlists() {
 
   const [deletingPlaylist, setDeletingPlaylist] = useState(null);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    async function loadQuickPlaylist() {
-      try {
-        setQuickLoading(true);
-        setQuickError("");
-
-        const response = await fetch(`${API_URL}/api/auth/playlists`, {
-          method: "GET",
-          credentials: "include",
-        });
-
-        const data = await response.json();
-
-        if (response.status === 401) {
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to load your playlist.");
-        }
-
-        const ids = [
-          ...(data.playlists?.movies || []),
-          ...(data.playlists?.tvSeries || []),
-          ...(data.playlists?.music || []),
-          ...(data.playlists?.games || []),
-        ].map(String);
-
-        const fetchedItems = await resolvePlaylistItems(ids);
-        setQuickItems(fetchedItems);
-      } catch (requestError) {
-        setQuickError(requestError.message);
-      } finally {
-        setQuickLoading(false);
-      }
-    }
-
-    loadQuickPlaylist();
-  }, [navigate]);
 
   useEffect(() => {
     loadCustomPlaylists();
@@ -185,42 +122,6 @@ function Playlists() {
       setCustomError(requestError.message);
     } finally {
       setCustomLoading(false);
-    }
-  }
-
-  const filteredQuickItems = useMemo(() => {
-    if (activeCategory === "all") return quickItems;
-    return quickItems.filter((item) => typeToCategoryKey[item.type] === activeCategory);
-  }, [quickItems, activeCategory]);
-
-  async function handleRemoveQuickItem(item) {
-    try {
-      setRemovingId(item.id);
-      setQuickError("");
-
-      const response = await fetch(`${API_URL}/api/auth/playlists/items`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ mediaId: String(item.id), mediaType: item.type }),
-      });
-
-      const data = await response.json();
-
-      if (response.status === 401) {
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(data.message || "Unable to remove this item from your playlist.");
-      }
-
-      setQuickItems((prev) => prev.filter((existing) => existing.id !== item.id));
-    } catch (requestError) {
-      setQuickError(requestError.message);
-    } finally {
-      setRemovingId(null);
     }
   }
 
@@ -411,7 +312,7 @@ function Playlists() {
   }
 
   return (
-    <div className="home-page">
+    <div className="playlists-page">
       <Navbar activeNav="home" />
 
       <main className="playlists-main">
@@ -512,68 +413,6 @@ function Playlists() {
             </section>
           ))
         )}
-
-        <section className="playlist-hub-section">
-          <h2>Liked</h2>
-          <p className="playlist-hub-sub">
-            Your playlist filled with all the movies, shows, music, and games you&apos;ve liked.
-          </p>
-
-          <div className="playlists-tabs">
-            {categories.map((currentCategory) => (
-              <button
-                key={currentCategory.key}
-                type="button"
-                className={
-                  activeCategory === currentCategory.key ? "search-tab active" : "search-tab"
-                }
-                onClick={() => setActiveCategory(currentCategory.key)}
-              >
-                {currentCategory.label}
-              </button>
-            ))}
-          </div>
-
-          {quickError && <p className="playlists-error">{quickError}</p>}
-
-          {quickLoading ? (
-            <p className="playlists-empty">Loading your playlists...</p>
-          ) : filteredQuickItems.length === 0 ? (
-            <p className="playlists-empty">
-              Nothing here yet. Add movies, shows, music, or games from their detail page.
-            </p>
-          ) : (
-            <div className="playlists-grid">
-              {filteredQuickItems.map((item) => (
-                <div className="playlist-card" key={item.id}>
-                  <button
-                    type="button"
-                    className="playlist-remove"
-                    onClick={() => handleRemoveQuickItem(item)}
-                    disabled={removingId === item.id}
-                    aria-label={`Remove ${item.title} from playlists`}
-                  >
-                    <X size={14} />
-                  </button>
-
-                  <div
-                    className="playlist-poster"
-                    onClick={() => openMedia(item)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") openMedia(item);
-                    }}
-                  >
-                    <img src={item.posterImage} alt={`${item.title} poster`} />
-                  </div>
-
-                  <p>{item.title}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
       </main>
 
       {createOpen && (
