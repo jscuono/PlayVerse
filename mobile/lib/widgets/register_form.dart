@@ -1,11 +1,11 @@
-
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../services/api_service.dart';
-import '../pages/home_page.dart';
 
 class RegisterForm extends StatefulWidget {
-  const RegisterForm({super.key});
+  final VoidCallback? onRegistered;
+
+  const RegisterForm({super.key, this.onRegistered});
 
   @override
   State<RegisterForm> createState() => _RegisterFormState();
@@ -23,42 +23,67 @@ class _RegisterFormState extends State<RegisterForm> {
   bool _isLoading = false;
 
   Future<void> _register() async {
-  if (_passwordController.text != _confirmPasswordController.text) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
-    }
-    return;
-  }
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+    if (email.isEmpty || password.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      }
+      return;
     }
-    return;
-  }
 
-  setState(() => _isLoading = true);
-  try {
-    await ApiService().register(
-      login: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(), 
-      email: _emailController.text.trim(), // ← added
-    );
+    if (!email.contains('@')) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address')));
+      }
+      return;
+    }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account created successfully!')));
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
+    if (password.length < 8) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 8 characters')));
+      }
+      return;
     }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+
+    if (password != _confirmPasswordController.text.trim()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+      }
+      return;
     }
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
+
+    setState(() => _isLoading = true);
+    try {
+      await ApiService().register(
+        login: email,
+        password: password,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: email,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created! Check your email to verify it before logging in.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        // Registration no longer logs the user in automatically — the
+        // account needs to be verified first. Switch back to the Login
+        // tab so they can log in once they've clicked the email link.
+        widget.onRegistered?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {

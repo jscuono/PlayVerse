@@ -17,30 +17,109 @@ class _LoginFormState extends State<LoginForm> {
   bool _isLoading = false;
 
   Future<void> _login() async {
-  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
-    return;
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      return;
+    }
+
+    // Clears any lingering snackbar from a previous attempt — e.g. the
+    // "Resend" action from an earlier unverified-account error — so it
+    // can't stick around once this attempt actually succeeds.
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    setState(() => _isLoading = true);
+    try {
+      await ApiService().login(
+        login: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login successful!')));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
+      }
+    } catch (e) {
+      if (mounted) {
+        final message = e.toString().replaceFirst('Exception: ', '');
+        final needsVerification = message.toLowerCase().contains('verify your email');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            action: needsVerification
+                ? SnackBarAction(label: 'Resend', onPressed: _resendVerification)
+                : null,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  setState(() => _isLoading = true);
-  try {
-    await ApiService().login(
-      login: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
+  Future<void> _resendVerification() async {
+    try {
+      final message = await ApiService().resendVerificationEmail(_emailController.text.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
+  void _showForgotPasswordDialog() {
+    final controller = TextEditingController(text: _emailController.text.trim());
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter your email or username and we\'ll send you a reset link.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: _fieldDecoration('Email or username', Icons.email_outlined),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final login = controller.text.trim();
+              Navigator.pop(dialogContext);
+              if (login.isEmpty) return;
+
+              try {
+                final message = await ApiService().forgotPassword(login);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  );
+                }
+              }
+            },
+            child: const Text('Send Link'),
+          ),
+        ],
+      ),
     );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login successful!')));
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
-    }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed: $e')));
-    }
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +160,16 @@ class _LoginFormState extends State<LoginForm> {
             child: _isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
                 : const Text('Login', style: TextStyle(fontSize: 16, color: Colors.white)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: GestureDetector(
+            onTap: _showForgotPasswordDialog,
+            child: const Text(
+              'Forgot password?',
+              style: TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ],
