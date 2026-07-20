@@ -7,11 +7,9 @@ class ApiService {
   ApiService._internal();
 
   final Dio _dio = Dio(BaseOptions(
-   //TODO: put actual URL here, for now using localhost for testingr
-   // baseUrl: 'http://localhost:5000/api',
-    baseUrl: 'http://10.0.0.2:5000/api',
-    connectTimeout: const Duration(seconds: 30),   // changed from 10
-    receiveTimeout: const Duration(seconds: 30),   // changed from 10
+    baseUrl: 'http://10.0.2.2:5000/api',
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
   ));
 
   final _storage = const FlutterSecureStorage();
@@ -33,13 +31,10 @@ class ApiService {
     final data = res.data;
     if (data['error'] != '') throw Exception(data['error']);
 
-    await _storage.write(key: 'user_id', value: data['id'].toString());
-    await _storage.write(key: 'firstName', value: firstName);
-    await _storage.write(key: 'lastName', value: lastName);
-    await _storage.write(key: 'login', value: login);
-    await _storage.write(key: 'email', value: email);
-    await _storage.write(key: 'password_length', value: password.length.toString());
-
+    // Deliberately NOT storing a session here anymore — accounts now
+    // require email verification before they can log in, so
+    // registering no longer logs the user in automatically. They log
+    // in explicitly, through the normal login flow, once verified.
     return data['id'];
   }
 
@@ -113,12 +108,37 @@ class ApiService {
     await _storage.write(key: 'password_length', value: newPassword.length.toString());
   }
 
-  Future<void> addMedia({required int userId, required String mediaId, required String title, required String mediaType, double? userRating}) async {
-    await _dio.post('/addmedia', data: {'userId': userId, 'mediaId': mediaId, 'title': title, 'mediaType': mediaType, if (userRating != null) 'userRating': userRating});
+  Future<void> addMedia({required int userId, required String mediaId, required String title, required String mediaType, required String playlistName, double? userRating}) async {
+    final res = await _dio.post('/addmedia', data: {
+      'userId': userId,
+      'mediaId': mediaId,
+      'title': title,
+      'mediaType': mediaType,
+      'playlistName': playlistName,
+      if (userRating != null) 'userRating': userRating,
+    });
+    final data = res.data;
+    if (data['error'] != null && data['error'] != '') throw Exception(data['error']);
   }
 
-  Future<void> removeMedia({required int userId, required String mediaId}) async {
-    await _dio.post('/removemedia', data: {'userId': userId, 'mediaId': mediaId});
+  Future<void> removeMedia({required int userId, required String mediaId, required String playlistName}) async {
+    await _dio.post('/removemedia', data: {'userId': userId, 'mediaId': mediaId, 'playlistName': playlistName});
+  }
+
+  Future<void> createPlaylistBackend({required int userId, required String playlistName}) async {
+    final res = await _dio.post('/createplaylist', data: {'userId': userId, 'playlistName': playlistName});
+    final data = res.data;
+    if (data['error'] != null && data['error'] != '') throw Exception(data['error']);
+  }
+
+  Future<void> deletePlaylistBackend({required int userId, required String playlistName}) async {
+    await _dio.post('/deleteplaylist', data: {'userId': userId, 'playlistName': playlistName});
+  }
+
+  Future<List<String>> getPlaylistNames({required int userId}) async {
+    final res = await _dio.post('/getplaylists', data: {'userId': userId});
+    final data = res.data;
+    return List<String>.from(data['playlistNames'] ?? []);
   }
 
   Future<void> updateRating({
@@ -175,29 +195,40 @@ class ApiService {
     return res.data['results'] ?? [];
   }
 
+  /// Looks up a YouTube trailer for the given title, returning the
+  /// video ID to open (or null if none was found / the request failed).
+  Future<String?> getTrailerVideoId({required String title, required String mediaType}) async {
+    try {
+      final res = await _dio.get('/gettrailer', queryParameters: {'title': title, 'mediaType': mediaType});
+      final data = res.data;
+      if (data['error'] != null && data['error'] != '') {
+        print('Backend error on /gettrailer: ${data['error']}');
+        return null;
+      }
+      return data['videoId'] as String?;
+    } catch (e) {
+      print('Failed to fetch trailer: $e');
+      return null;
+    }
+  }
+
+  Future<String> resendVerificationEmail(String login) async {
+    final res = await _dio.post('/resendverification', data: {'login': login});
+    final data = res.data;
+    if (data['error'] != null && data['error'] != '') throw Exception(data['error']);
+    return 'A new verification email has been sent.';
+  }
+
+  Future<String> forgotPassword(String login) async {
+    final res = await _dio.post('/forgotpassword', data: {'login': login});
+    final data = res.data;
+    if (data['error'] != null && data['error'] != '') throw Exception(data['error']);
+    return data['message'] ?? 'If an account matching that exists, a reset link has been sent.';
+  }
+
   Future<int?> getCurrentUserId() async {
     final id = await _storage.read(key: 'user_id');
     return id != null ? int.parse(id) : null;
-  }
-
-  /// Fetches a trending list for one category from our backend's media
-  /// proxy. Returns the raw list of maps
-  /// into MediaItem objects via MediaItem.fromJson.
-  /// category must be one of: 'movies', 'shows', 'games', 'music'
-  Future<List<dynamic>> getTrendingMedia(String category) async {
-    try {
-      final res = await _dio.get('/media/trending/$category');
-      final data = res.data;
-      if (data['error'] != null && data['error'] != '') {
-        throw Exception(data['error']);
-      }
-      return data['results'] ?? [];
-    } catch (e) {
-      // Network hiccups or a missing API key shouldn't crash the home
-      // page — just return an empty list for this category and let
-      // the row show its existing "Nothing here yet." empty state.
-      return [];
-    }
   }
 
   Future<void> logout() async => await _storage.deleteAll();
