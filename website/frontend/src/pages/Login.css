@@ -87,6 +87,14 @@ html, body, #root {
   padding: 12px 0;
 }
 
+.login-section {
+  margin-right: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
 .login-card {
   width: 100%;
   max-width: 400px;

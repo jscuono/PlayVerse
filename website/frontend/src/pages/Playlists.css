@@ -215,6 +215,12 @@
   cursor: pointer;
 }
 
+.playlist-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
 .playlist-poster {
   width: 100%;
   aspect-ratio: 2 / 3;

@@ -322,6 +322,7 @@ function Playlists() {
 
       <main className="playlists-main">
         <h1>Playlists</h1>
+
         <p>Discover what to watch, what to hear, and what to play next.</p>
 
         <div className="playlist-hub-head">
