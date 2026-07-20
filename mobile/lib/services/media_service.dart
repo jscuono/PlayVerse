@@ -7,7 +7,7 @@ class MediaService {
   MediaService._internal();
 
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://playverseapp.onrender.com',
+    baseUrl: 'https://playverseapp.onrender.com/api',
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 15),
   ));
