@@ -26,20 +26,50 @@ const typeToCategoryKey = {
 };
 
 async function resolvePlaylistItems(entries) {
-  const resolved = await Promise.all(
-    (entries || []).map(async (entry) => {
-      try {
-        const mediaId = typeof entry === "string" ? entry : entry.mediaId;
-        const { type, sourceId } = parseMediaId(mediaId);
-        const result = await fetchMediaItem(type, sourceId);
-        return result.item;
-      } catch {
+  const validMediaIds = [...new Set(
+    (entries || [])
+      .map((entry) => (typeof entry === "string" ? entry : entry?.mediaId))
+      .filter(Boolean)
+      .map(String)
+      .filter((mediaId) => mediaId.includes("-") && mediaId.split("-").slice(1).join("-").trim()),
+  )];
+
+  const settled = await Promise.allSettled(
+    validMediaIds.map(async (mediaId) => {
+      const { type, sourceId } = parseMediaId(mediaId);
+
+      if (!type || !sourceId) {
         return null;
       }
+
+      const result = await fetchMediaItem(type, sourceId);
+      const item = result?.item;
+
+      if (!item?.id || !item?.title || !item?.posterImage) {
+        return null;
+      }
+
+      return item;
     }),
   );
 
-  return resolved.filter(Boolean);
+  const resolved = settled.flatMap((result) => {
+    if (result.status !== "fulfilled" || !result.value) {
+      return [];
+    }
+
+    return [result.value];
+  });
+
+  const uniqueById = new Map();
+
+  for (const item of resolved) {
+    if (!uniqueById.has(item.id)) {
+      uniqueById.set(item.id, item);
+    }
+  }
+
+  return [...uniqueById.values()];
 }
 
 function Playlists() {
