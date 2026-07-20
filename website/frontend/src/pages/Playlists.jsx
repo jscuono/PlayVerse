@@ -311,6 +311,11 @@ function Playlists() {
     }
   }
 
+  const totalItems = customPlaylists.reduce(
+    (sum, playlist) => sum + (playlist.resolvedItems?.length || 0),
+    0,
+  );
+
   return (
     <div className="playlists-page">
       <Navbar activeNav="home" />
@@ -320,7 +325,10 @@ function Playlists() {
         <p>Discover what to watch, what to hear, and what to play next.</p>
 
         <div className="playlist-hub-head">
-          <h2>Your Playlists</h2>
+          <div>
+            <h2>Your Playlists</h2>
+            <p className="playlist-hub-sub">Curate mood-based mixes or save your next obsession.</p>
+          </div>
           <button
             type="button"
             className="playlist-hub-create-btn"
@@ -337,81 +345,89 @@ function Playlists() {
         {customError && <p className="playlists-error">{customError}</p>}
 
         {customLoading ? (
-          <p className="playlists-empty">Loading your playlists...</p>
+          <div className="playlists-empty">Loading your playlists...</div>
         ) : customPlaylists.length === 0 ? (
-          <p className="playlists-empty">
+          <div className="playlists-empty">
             You haven&apos;t created any playlists yet. Tap &quot;New Playlist&quot; to start one —
             it can mix movies, shows, music, and games together.
-          </p>
+          </div>
         ) : (
-          customPlaylists.map((playlist) => (
-            <section className="playlist-hub-section" key={playlist.id}>
-              <div className="playlists-detail-head">
-                <h2>{playlist.name}</h2>
+          <div className="playlist-sections">
+            {customPlaylists.map((playlist) => (
+              <section className="playlist-hub-section" key={playlist.id}>
+                <div className="playlists-detail-head">
+                  <div>
+                    <h2>{playlist.name}</h2>
+                    <p className="playlist-hub-sub">
+                      {(playlist.resolvedItems || []).length} saved title
+                      {(playlist.resolvedItems || []).length === 1 ? "" : "s"}
+                    </p>
+                  </div>
 
-                <div className="playlists-detail-actions">
-                  <button
-                    type="button"
-                    className="playlist-hub-icon-btn"
-                    onClick={() => {
-                      setRenamingPlaylist(playlist);
-                      setRenameValue(playlist.name);
-                      setRenameError("");
-                    }}
-                    aria-label={`Rename ${playlist.name}`}
-                  >
-                    <Pencil size={14} />
-                  </button>
+                  <div className="playlists-detail-actions">
+                    <button
+                      type="button"
+                      className="playlist-hub-icon-btn"
+                      onClick={() => {
+                        setRenamingPlaylist(playlist);
+                        setRenameValue(playlist.name);
+                        setRenameError("");
+                      }}
+                      aria-label={`Rename ${playlist.name}`}
+                    >
+                      <Pencil size={14} />
+                    </button>
 
-                  <button
-                    type="button"
-                    className="playlist-hub-icon-btn danger"
-                    onClick={() => setDeletingPlaylist(playlist)}
-                    aria-label={`Delete ${playlist.name}`}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                    <button
+                      type="button"
+                      className="playlist-hub-icon-btn danger"
+                      onClick={() => setDeletingPlaylist(playlist)}
+                      aria-label={`Delete ${playlist.name}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {(playlist.resolvedItems || []).length === 0 ? (
-                <p className="playlists-empty">
-                  Nothing here yet. Open a title and use &quot;Add to Playlist&quot; to add it
-                  here.
-                </p>
-              ) : (
-                <div className="playlists-grid">
-                  {playlist.resolvedItems.map((item) => (
-                    <div className="playlist-card" key={item.id}>
-                      <button
-                        type="button"
-                        className="playlist-remove"
-                        onClick={() => handleRemoveFromCustomPlaylist(playlist.id, item)}
-                        disabled={removingCustomKey === `${playlist.id}:${item.id}`}
-                        aria-label={`Remove ${item.title} from ${playlist.name}`}
-                      >
-                        <X size={14} />
-                      </button>
+                {(playlist.resolvedItems || []).length === 0 ? (
+                  <div className="playlists-empty">
+                    Nothing here yet. Open a title and use &quot;Add to Playlist&quot; to add it
+                    here.
+                  </div>
+                ) : (
+                  <div className="playlists-grid">
+                    {playlist.resolvedItems.map((item) => (
+                      <div className="playlist-card" key={item.id}>
+                        <button
+                          type="button"
+                          className="playlist-remove"
+                          onClick={() => handleRemoveFromCustomPlaylist(playlist.id, item)}
+                          disabled={removingCustomKey === `${playlist.id}:${item.id}`}
+                          aria-label={`Remove ${item.title} from ${playlist.name}`}
+                        >
+                          <X size={14} />
+                        </button>
 
-                      <div
-                        className="playlist-poster"
-                        onClick={() => openMedia(item)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") openMedia(item);
-                        }}
-                      >
-                        <img src={item.posterImage} alt={`${item.title} poster`} />
+                        <div
+                          className="playlist-poster"
+                          onClick={() => openMedia(item)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") openMedia(item);
+                          }}
+                        >
+                          <img src={item.posterImage} alt={`${item.title} poster`} />
+                        </div>
+
+                        <p>{item.title}</p>
                       </div>
-
-                      <p>{item.title}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          ))
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
         )}
       </main>
 
