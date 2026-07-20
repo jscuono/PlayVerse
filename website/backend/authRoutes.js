@@ -12,6 +12,23 @@ const router = express.Router();
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const isProduction = process.env.NODE_ENV === "production";
+
+const authCookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
+};
+
+const clearAuthCookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  path: "/",
+};
+
 function getUsersCollection() {
   return getDB().collection("users");
 }
@@ -36,12 +53,11 @@ function createAppToken(user) {
 }
 
 function setAuthCookie(res, token) {
-  res.cookie("pv_auth", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  res.cookie("pv_auth", token, authCookieOptions);
+}
+
+function clearAuthCookie(res) {
+  res.clearCookie("pv_auth", clearAuthCookieOptions);
 }
 
 function getPublicUser(user) {
@@ -429,11 +445,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
 
 //Logout
 router.post("/logout", (req, res) => {
-  res.clearCookie("pv_auth", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
+  clearAuthCookie(res);
 
   return res.json({
     message: "Logged out.",
@@ -460,11 +472,7 @@ router.delete("/account", requireAuth, async (req, res, next) => {
       });
     }
 
-    res.clearCookie("pv_auth", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    clearAuthCookie(res);
 
     return res.json({
       message: "Account deleted successfully.",
@@ -590,11 +598,7 @@ router.patch("/account", requireAuth, async (req, res, next) => {
     });
 
     if (emailChanged) {
-      res.clearCookie("pv_auth", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
+      clearAuthCookie(res);
     }
 
     return res.json({
@@ -737,15 +741,7 @@ router.post("/reset-password", async (req, res, next) => {
       },
     );
 
-    /*
-     * Log out the current browser session after changing
-     * the password.
-     */
-    res.clearCookie("pv_auth", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    clearAuthCookie(res);
 
     return res.json({
       message: "Your password has been reset successfully. You can now log in.",
@@ -931,12 +927,7 @@ router.delete("/playlists/items", requireAuth, async (req, res, next) => {
   }
 });
 
-const validRatingTypes = new Set([
-  "movie",
-  "show",
-  "music",
-  "game",
-]);
+const validRatingTypes = new Set(["movie", "show", "music", "game"]);
 
 // ---------------------------------------------------------------------
 // Custom (named) playlists — each one can mix movies, shows, music, and
@@ -1250,7 +1241,6 @@ router.get("/ratings/:mediaId", requireAuth, async (req, res, next) => {
     next(error);
   }
 });
-
 
 router.put("/ratings/:mediaId", requireAuth, async (req, res, next) => {
   try {
