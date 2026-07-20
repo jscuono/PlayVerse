@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser");
 const { connectDB } = require("./db");
 const authRoutes = require("./authRoutes");
 const mediaRoutes = require("./mediaRoutes");
+const recommendationRoutes = require("./services/groqRecom");
 
 const app = express();
 
@@ -19,13 +20,14 @@ const requiredEnvironmentVariables = [
   "GOOGLE_CLIENT_ID",
   "TMDB_API_KEY",
   "RAWG_API_KEY",
-  //"GEMINI_API_KEY"
-  //"YOUTUBE_API_KEY",
+  "GROQ_API_KEY",
 ];
 
 for (const variableName of requiredEnvironmentVariables) {
   if (!process.env[variableName]) {
-    throw new Error(`Missing environment variable: ${variableName}`);
+    throw new Error(
+      `Missing environment variable: ${variableName}`
+    );
   }
 }
 
@@ -33,7 +35,7 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
-  }),
+  })
 );
 
 app.use(express.json());
@@ -47,6 +49,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/media", mediaRoutes);
+app.use("/api/recommendations", recommendationRoutes);
 
 app.use((error, req, res, next) => {
   console.error(error);
@@ -58,14 +61,12 @@ app.use((error, req, res, next) => {
 
 const port = Number(process.env.PORT) || 5000;
 
-//Groq Ai
-const recommendationRoutes = require('./services/groqRecom');
-app.use('/api/recommendations', recommendationRoutes);
-
 connectDB()
   .then(() => {
     app.listen(port, () => {
-      console.log(`Backend running on http://localhost:${port}`);
+      console.log(
+        `Backend running on http://localhost:${port}`
+      );
     });
   })
   .catch((error) => {
